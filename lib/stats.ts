@@ -3,7 +3,7 @@ export type Player = {id:string;name:string;team:string;profileUrl?:string;stats
 export type Dataset = {id:string;title:string;event:string;date:string;kind:'match'|'event'|'player';sourceUrl:string;importedAt:string;scopes:{id:string;name:string}[];players:Player[];notes:string[];demo?:boolean};
 export type Metric = {key:string;label:string;name:string;min:number;max:number;decimals:number;unit?:string;inverse?:boolean;description:string};
 export const performance:Metric[] = [
- {key:'rating',label:'Rating',name:'综合评分',min:0,max:2,decimals:2,description:'HLTV 原始综合评分；版本见选手信息。雷达刻度 0–2。'},
+ {key:'rating',label:'Rating',name:'综合评分',min:0,max:1.3,decimals:2,description:'HLTV 原始综合评分；版本见选手信息。雷达参考满刻度为 1.30，超过时按比例越出参考圈。'},
  {key:'adr',label:'ADR',name:'回合均伤',min:0,max:120,decimals:1,description:'平均每回合造成的伤害。雷达刻度 0–120。'},
  {key:'kast',label:'KAST',name:'回合贡献率',min:0,max:100,decimals:1,unit:'%',description:'有击杀、助攻、存活或死亡被补枪的回合占比。刻度 0–100%。'},
  {key:'kpr',label:'KPR',name:'回合均击杀',min:0,max:1.2,decimals:2,description:'每回合击杀数。雷达刻度 0–1.2。'},

@@ -32,7 +32,7 @@ test('player profile recognizes nested attribute score /100 and avoids T rating'
  assert.equal(p.stats.event.rating,1.34);assert.equal(p.ratingVersion,'3.0');assert.equal(p.stats.event.firepower,99);assert.equal(p.stats.event.kast,78);assert.equal(p.stats.event.multiKill,undefined);assert.equal(p.stats.event.opening,undefined);
 });
 test('over-reference ADR/Rating/Swing remain proportional without upper clipping',()=>{
- assert.ok(Math.abs(normalized(132,performance[1])-110)<1e-9);assert.equal(normalized(3,performance[0]),150);assert.equal(normalized(20,performance[5]),150);
+ assert.ok(Math.abs(normalized(132,performance[1])-110)<1e-9);assert.equal(normalized(1.3,performance[0]),100);assert.equal(normalized(2.6,performance[0]),200);assert.equal(normalized(20,performance[5]),150);
  const peak=Math.max(100,normalized(150,performance[1]));const radius=170/(peak/100);
  assert.equal(radius,136);assert.equal(radius*normalized(150,performance[1])/100,170);assert.equal(radius*normalized(120,performance[1])/100,136);
 });
