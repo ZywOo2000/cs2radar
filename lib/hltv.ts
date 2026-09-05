@@ -44,7 +44,7 @@ export const number=(s:string|undefined)=>{if(!s)return undefined;const m=txt(s)
 const label=(s:string)=>txt(s).toLowerCase().replace(/[^\w%/−-]/g,'');
 function version(s:string){return s.match(/rating\s*([123]\.\d)/i)?.[1]||'未标注'}
 const metricLabels:Record<string,string>={rating:'rating',adr:'adr','damage/round':'adr',damageperround:'adr',kast:'kast',kpr:'kpr','kills/round':'kpr',killsperround:'kpr',dpr:'dpr','deaths/round':'dpr',deathsperround:'dpr',swing:'swing',roundswing:'swing',mkrating:'multiKill','multi-killrating':'multiKill',multikillrating:'multiKill','totalkills':'kills','totaldeaths':'deaths','k/d':'kd','k/dratio':'kd','k-d':'kdDiff','k−d':'kdDiff','headshot%':'hs','hs%':'hs',maps:'maps',mapsplayed:'maps',rounds:'rounds',roundsplayed:'rounds',firepower:'firepower',entrying:'entrying',trading:'trading',opening:'opening',clutching:'clutching',sniping:'sniping',utility:'utility'};
-function keyFor(s:string){const l=label(s);return /^rating[123]/.test(l)?'rating':metricLabels[l]}
+function keyFor(s:string){const l=label(s);if(['multi-kill','multikill','multi-kill%','multikill%'].includes(l))return 'multiKillPct';if(['surviving','survivalrate','surviving%'].includes(l))return 'surviving';return /^rating[123]/.test(l)?'rating':metricLabels[l]}
 function derive(s:Stats){if(s.kills!==undefined&&s.deaths!==undefined){s.kdDiff=s.kills-s.deaths;if(s.deaths>0)s.kd=s.kills/s.deaths}if(s.rounds&&s.rounds>0){if(s.kills!==undefined&&s.kpr===undefined)s.kpr=s.kills/s.rounds;if(s.deaths!==undefined&&s.dpr===undefined)s.dpr=s.deaths/s.rounds}return s}
 function base($:CheerioAPI,u:URL,kind:Dataset['kind']):Dataset{
  const title=txt($('title').first().text()).replace(/\s*\|\s*HLTV\.org.*$/i,'');
@@ -77,7 +77,7 @@ export function parseMatch(html:string,u:URL):Dataset{
    cells.each((i,cell)=>{
     const val=txt($(cell).text());const h=headers[i]||'';const k=keyFor(h);
     if((label(h)==='k-d'||label(h)==='k−d')&&/^\d+\s*[-−]\s*\d+$/.test(val)){const pair=val.split(/[-−]/).map(Number);stats.kills=pair[0];stats.deaths=pair[1];return}
-    if(k){const value=number(val);if(value!==undefined)stats[k]=value}
+    if(k){const value=k==='multiKillPct'&&!val.includes('%')?undefined:number(val);if(value!==undefined)stats[k]=value}
    });
    const fallback:Record<string,string>={kills:'.st-kills',deaths:'.st-deaths',kast:'.st-kdratio,.kast',adr:'.st-adr',rating:'.st-rating,.rating',swing:'.st-swing,.swing'};
    for(const [k,sel]of Object.entries(fallback)){if(stats[k]===undefined){const node=r.find(sel).first();if(node.length){const raw=node.clone();raw.find('.ratingDesc,.gtSmartphone-only').remove();const value=number(raw.text());if(value!==undefined)stats[k]=value}}}
@@ -105,7 +105,7 @@ export function parseEvent(html:string,u:URL,title?:string):Dataset{
  table.find('tbody tr').each((_,el)=>{
   const r=$(el),a=r.find('.playerCol a').first(),href=a.attr('href'),id=href?.match(/players\/(\d+)/)?.[1];if(!id)return;
   const pu=new URL(href!,u);for(const [k,v]of u.searchParams)pu.searchParams.set(k,v);
-  const stats:Stats={};r.children('td').each((i,cell)=>{const k=keyFor(headers[i]||'');const val=number($(cell).text());if(k&&val!==undefined)stats[k]=val});
+  const stats:Stats={};r.children('td').each((i,cell)=>{const k=keyFor(headers[i]||'');const raw=$(cell).text();const val=k==='multiKillPct'&&!raw.includes('%')?undefined:number(raw);if(k&&val!==undefined)stats[k]=val});
   for(const [k,sel]of Object.entries({rating:'.ratingCol',kdDiff:'.kdDiffCol'})){const val=number(r.find(sel).text());if(val!==undefined)stats[k]=val}
   out.players.push({id,name:txt(a.text()),team:r.find('.teamCol img').toArray().map(x=>$(x).attr('title')).filter(Boolean).join(' / ')||txt(r.find('.teamCol').text())||'战队未提供',profileUrl:safeLink(pu.href,u),ratingVersion:version(headers.join(' ')),stats:{event:derive(stats)}});
  });
@@ -118,10 +118,10 @@ export function parsePlayer(html:string,u:URL):Dataset{
  const name=txt($('.summaryNickname,.playerNickname').first().text())||txt($('.context-item-name').first().text());
  if(!name)throw new ImportError('NO_STATS','无法识别该选手统计页面，未导入数据。');
  let v='未标注';
- $('.stats-row').each((_,el)=>{const row=$(el),spans=row.children('span'),k=keyFor(spans.first().text());const val=number(spans.last().text());if(k&&val!==undefined)stats[k]=val;if(k==='rating')v=version(spans.first().text())});
+ $('.stats-row').each((_,el)=>{const row=$(el),spans=row.children('span'),k=keyFor(spans.first().text());const rawValue=spans.last().text();const val=k==='multiKillPct'&&!rawValue.includes('%')?undefined:number(rawValue);if(k&&val!==undefined)stats[k]=val;if(k==='rating')v=version(spans.first().text())});
  // Summary boxes use explicit labels; do not read T / CT values as the overall rating.
  $('.summaryStatBreakdown,.summaryStatBreakdownContainer,.summary-stat,.summaryStat').each((_,el)=>{
-  const node=$(el);const labelNode=node.find('.summaryStatLabel,.summaryStatName,.label').first();const k=keyFor(labelNode.text());const valueNode=node.find('.summaryStatValue,.value').first();const val=number(valueNode.text());
+  const node=$(el);const labelNode=node.find('.summaryStatLabel,.summaryStatName,.label').first();const k=keyFor(labelNode.text());const valueNode=node.find('.summaryStatValue,.value').first();const val=k==='multiKillPct'&&!valueNode.text().includes('%')?undefined:number(valueNode.text());
   if(k&&val!==undefined&&stats[k]===undefined){stats[k]=val;if(k==='rating')v=version(labelNode.text())}
  });
  for(const k of ['firepower','entrying','trading','opening','clutching','sniping','utility']){
@@ -136,7 +136,7 @@ export function parsePlayer(html:string,u:URL):Dataset{
   const ancestry=node.parents('[data-side],.ctstats,.tstats,[data-eco-adjusted="true"]');
   if(ancestry.toArray().some(x=>{const side=$(x).attr('data-side');return side?!/^(all|both)$/i.test(side):true}))return;
   const siblings=[node.next(),node.prev(),node.parent().next(),node.parent().prev()];let val:number|undefined;
-  for(const sibling of siblings){const text=txt(sibling.text());if(/^[+−-]?\d+(?:\.\d+)?\s*%?(?:\s*\/\s*100)?$/.test(text)){val=number(text);break}}
+  for(const sibling of siblings){const text=txt(sibling.text());if(k==='multiKillPct'&&!text.includes('%'))continue;if(/^[+−-]?\d+(?:\.\d+)?\s*%?(?:\s*\/\s*100)?$/.test(text)){val=number(text);break}}
   if(val===undefined)return;
   if(['firepower','entrying','trading','opening','clutching','sniping','utility'].includes(k)&&(val<0||val>100))return;
   stats[k]=val;if(k==='rating')v=version(raw);

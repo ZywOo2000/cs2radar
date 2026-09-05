@@ -23,9 +23,28 @@ export const extraMetrics:Metric[] = [
  {key:'hs',label:'HS',name:'爆头率',min:0,max:100,decimals:1,unit:'%',description:'爆头击杀占总击杀的比例。'},
 ];
 export const normalized=(value:number,m:Metric)=>Math.max(0,(m.inverse?1-(value-m.min)/(m.max-m.min):(value-m.min)/(m.max-m.min))*100);
+export const broadcastMetrics:Metric[]=[
+ {key:'kpr',label:'KPR',name:'回合击杀',min:0,max:.85,decimals:2,description:'每回合击杀数；参考满刻度 0.85。'},
+ {key:'surviving',label:'Surviving',name:'存活率',min:0,max:43,decimals:2,unit:'%',description:'存活回合占比。优先由总回合和死亡数计算；仅有 DPR 时由 (1−DPR)×100 换算，受来源舍入影响。参考满刻度 43%。'},
+ {key:'adr',label:'ADR',name:'回合伤害',min:0,max:85,decimals:2,description:'平均回合伤害；参考满刻度 85。'},
+ {key:'kast',label:'KAST',name:'回合贡献率',min:0,max:78,decimals:2,unit:'%',description:'有击杀、助攻、存活或被补枪的回合占比；参考满刻度 78%。'},
+ {key:'multiKillPct',label:'Multi-kill',name:'多杀回合占比',min:0,max:20,decimals:2,unit:'%',description:'一回合至少取得两次击杀的回合占比，参考满刻度 20%。与 MK Rating 不同；缺失时不推算。'},
+ {key:'rating',label:'Rating',name:'综合评分',min:0,max:1.3,decimals:2,description:'HLTV 原始综合评分；参考满刻度 1.30，版本不同不共同比较。'},
+];
+export const screenshotReference:Stats={kpr:.65,surviving:32.54,adr:70.58,kast:70.98,multiKillPct:15.22,rating:1,swing:-.32};
+export function broadcastStats(input:Stats):Stats{
+ const s={...input};
+ if(!Number.isFinite(s.surviving)){
+  if(Number.isFinite(s.rounds)&&s.rounds!>0&&Number.isFinite(s.deaths)&&s.deaths!>=0&&s.deaths!<=s.rounds!)s.surviving=(s.rounds!-s.deaths!)/s.rounds!*100;
+  else if(Number.isFinite(s.dpr)&&s.dpr!>=0&&s.dpr!<=1)s.surviving=(1-s.dpr!)*100;
+ }
+ return s;
+}
 export const format=(value:number|undefined,m:Metric)=>value===undefined||!Number.isFinite(value)?'—':(m.key==='swing'&&value>0?'+':'')+value.toFixed(m.decimals)+(m.unit||'');
 export function sharedMetrics(ms:Metric[],a:Stats,b?:Stats,versionA?:string,versionB?:string){return ms.filter(m=>Number.isFinite(a[m.key])&&(!b||Number.isFinite(b[m.key]))&&(!(b&&m.key==='rating')||(versionA===versionB&&versionA!=='未标注')));}
 export const demo:Dataset={id:'demo',title:'图表演示 · 虚构比赛',event:'示例赛事',date:'',kind:'match',sourceUrl:'',importedAt:'',demo:true,notes:['所有示例数值均为虚构，仅用于体验图表，不代表真实选手或比赛。'],scopes:[{id:'all',name:'整场比赛'},{id:'map-1',name:'Mirage · 示例'}],players:[
  {id:'demo-a',name:'PLAYER A',team:'示例战队 ALPHA',ratingVersion:'3.0（演示）',stats:{all:{rating:1.42,adr:91.5,kast:80.2,kpr:.86,dpr:.59,swing:3.2,firepower:87,entrying:63,trading:72,opening:85,clutching:45,sniping:20,utility:56,kills:49,deaths:34,kdDiff:15,kd:49/34,rounds:57,maps:3},'map-1':{rating:1.61,adr:102.4,kast:85,kpr:1,dpr:.55,swing:5.1,kills:20,deaths:11,rounds:20,maps:1}}},
  {id:'demo-b',name:'PLAYER B',team:'示例战队 BRAVO',ratingVersion:'3.0（演示）',stats:{all:{rating:1.26,adr:79.4,kast:84.2,kpr:.79,dpr:.53,swing:2.4,firepower:79,entrying:30,trading:81,opening:65,clutching:83,sniping:90,utility:42,kills:45,deaths:30,kdDiff:15,kd:1.5,rounds:57,maps:3},'map-1':{rating:1.31,adr:83.2,kast:80,kpr:.85,dpr:.6,swing:2.1,kills:17,deaths:12,rounds:20,maps:1}}}
 ]};
+// Explicitly fictional multi-kill percentages for the existing labelled demo.
+demo.players.forEach((p,i)=>{p.stats.all.multiKillPct=i===0?22:16;p.stats['map-1'].multiKillPct=i===0?25:20});
