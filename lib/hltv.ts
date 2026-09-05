@@ -115,7 +115,7 @@ export function parseEvent(html:string,u:URL,title?:string):Dataset{
 export function parsePlayer(html:string,u:URL):Dataset{
  const $=load(html),out=base($,u,'player'),stats:Stats={};
  const id=u.pathname.match(/players\/(\d+)/)?.[1];if(!id)throw new ImportError('INVALID_PLAYER','选手链接无效。');
- const name=txt($('.context-item-name,.summaryNickname,.playerNickname').first().text());
+ const name=txt($('.summaryNickname,.playerNickname').first().text())||txt($('.context-item-name').first().text());
  if(!name)throw new ImportError('NO_STATS','无法识别该选手统计页面，未导入数据。');
  let v='未标注';
  $('.stats-row').each((_,el)=>{const row=$(el),spans=row.children('span'),k=keyFor(spans.first().text());const val=number(spans.last().text());if(k&&val!==undefined)stats[k]=val;if(k==='rating')v=version(spans.first().text())});
@@ -131,12 +131,12 @@ export function parsePlayer(html:string,u:URL):Dataset{
  // Accept explicitly paired labels and numeric values across HLTV summary layout variants.
  // Restrict to leaf labels outside tables and skip side-specific / eco-adjusted containers.
  $('span,div').each((_,el)=>{
-  const node=$(el);if(node.children().length||node.closest('table,nav,footer,script').length)return;
+  const node=$(el);if(node.closest('table,nav,footer,script,[hidden],[aria-hidden="true"]').length)return;
   const raw=txt(node.text());if(raw.length>32)return;const k=keyFor(raw);if(!k||stats[k]!==undefined)return;
   const ancestry=node.parents('[data-side],.ctstats,.tstats,[data-eco-adjusted="true"]');
   if(ancestry.toArray().some(x=>{const side=$(x).attr('data-side');return side?!/^(all|both)$/i.test(side):true}))return;
-  const siblings=[node.next(),node.prev()];let val:number|undefined;
-  for(const sibling of siblings){const text=txt(sibling.text());if(/^[+−-]?\d+(?:\.\d+)?%?$/.test(text)){val=number(text);break}}
+  const siblings=[node.next(),node.prev(),node.parent().next(),node.parent().prev()];let val:number|undefined;
+  for(const sibling of siblings){const text=txt(sibling.text());if(/^[+−-]?\d+(?:\.\d+)?\s*%?(?:\s*\/\s*100)?$/.test(text)){val=number(text);break}}
   if(val===undefined)return;
   if(['firepower','entrying','trading','opening','clutching','sniping','utility'].includes(k)&&(val<0||val>100))return;
   stats[k]=val;if(k==='rating')v=version(raw);

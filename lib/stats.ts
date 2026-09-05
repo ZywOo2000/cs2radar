@@ -22,7 +22,7 @@ export const extraMetrics:Metric[] = [
  {key:'multiKill',label:'MK Rating',name:'多杀评分',min:0,max:2,decimals:2,description:'HLTV Multi-Kill Rating。'},
  {key:'hs',label:'HS',name:'爆头率',min:0,max:100,decimals:1,unit:'%',description:'爆头击杀占总击杀的比例。'},
 ];
-export const normalized=(value:number,m:Metric)=>Math.max(0,Math.min(100,(m.inverse?1-(value-m.min)/(m.max-m.min):(value-m.min)/(m.max-m.min))*100));
+export const normalized=(value:number,m:Metric)=>Math.max(0,(m.inverse?1-(value-m.min)/(m.max-m.min):(value-m.min)/(m.max-m.min))*100);
 export const format=(value:number|undefined,m:Metric)=>value===undefined||!Number.isFinite(value)?'—':(m.key==='swing'&&value>0?'+':'')+value.toFixed(m.decimals)+(m.unit||'');
 export function sharedMetrics(ms:Metric[],a:Stats,b?:Stats,versionA?:string,versionB?:string){return ms.filter(m=>Number.isFinite(a[m.key])&&(!b||Number.isFinite(b[m.key]))&&(!(b&&m.key==='rating')||(versionA===versionB&&versionA!=='未标注')));}
 export const demo:Dataset={id:'demo',title:'图表演示 · 虚构比赛',event:'示例赛事',date:'',kind:'match',sourceUrl:'',importedAt:'',demo:true,notes:['所有示例数值均为虚构，仅用于体验图表，不代表真实选手或比赛。'],scopes:[{id:'all',name:'整场比赛'},{id:'map-1',name:'Mirage · 示例'}],players:[
