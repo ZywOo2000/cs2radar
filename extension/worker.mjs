@@ -6,7 +6,7 @@ chrome.runtime.onConnect.addListener(port=>{
  const send=m=>{try{port.postMessage(m)}catch{}};
  port.onDisconnect.addListener(()=>{for(const j of jobs.values())j.cancelled=true;jobs.clear()});
  port.onMessage.addListener(async m=>{
-  if(m.type==='hello'){send({type:'ready',version:'1.0.0'});return}
+  if(m.type==='hello'){send({type:'ready',version:'1.0.1'});return}
   if(m.type==='ping')return;
   if(m.type==='cancel'){const j=jobs.get(m.id);if(j)j.cancelled=true;return}
   if(m.type!=='import'||typeof m.id!=='string'||m.id.length>80)return;
@@ -22,13 +22,14 @@ chrome.runtime.onConnect.addListener(port=>{
    let last='',parseError='';
    while(!job.cancelled&&Date.now()<deadline){
     let current;try{current=await chrome.tabs.get(tab.id)}catch{throw Error('HLTV 标签页已关闭，请重新导入。')}
-    if(current.status==='complete'){
+    // A tab can stay "loading" while advertisements load after the stats DOM is ready.
+    if(current.url&&current.url!=='about:blank'){
      let actual;try{actual=sourceUrl(current.url)}catch{throw Error('HLTV 页面已跳转到不支持的地址，请重新导入。')}
      if(actual.href!==target.href)throw Error('HLTV 页面或赛事筛选已改变，请使用当前链接重新导入。');
      let result;
      try{
-      await chrome.scripting.executeScript({target:{tabId:tab.id},files:['extractor.js']});
-      const response=await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>globalThis.__cs2RadarExtract()});
+      await chrome.scripting.executeScript({target:{tabId:tab.id},files:['extractor.js'],injectImmediately:true});
+      const response=await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>globalThis.__cs2RadarExtract(),injectImmediately:true});
       result=response[0]?.result;
      }catch{result={status:'waiting',message:'等待 HLTV 页面加载；如出现验证，请在该页完成。'}}
      if(job.cancelled)return;
@@ -41,7 +42,7 @@ chrome.runtime.onConnect.addListener(port=>{
      const message=result?.message||'等待 HLTV 页面加载…';
      if(last!==message){last=message;send({type:'progress',id:m.id,message})}
     }
-    await new Promise(r=>setTimeout(r,2000));
+    await new Promise(r=>setTimeout(r,500));
    }
    if(!job.cancelled)throw Error(parseError||'等待 HLTV 超时（3 分钟）。请完成页面验证后重新导入。');
   }catch(e){if(!job.cancelled)send({type:'error',id:m.id,message:e.message||'扩展读取失败，请重试。'})}

@@ -4,9 +4,9 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {parsePlayer,sourceUrl} from '../lib/hltv.ts';
 import {normalized,performance} from '../lib/stats.ts';
-function harness({result,actual,closed=false,sleep=setTimeout}={}){
+function harness({result,actual,closed=false,sleep=setTimeout,status='complete'}={}){
  let onConnect,listener,disconnect;const sent=[],created=[];
- const chrome={runtime:{onConnect:{addListener:fn=>onConnect=fn}},tabs:{create:async args=>{created.push(args);return {id:1}},get:async()=>{if(closed)throw Error();return {status:'complete',url:actual||created[0].url}}},scripting:{executeScript:async args=>args.files?[]:[{result:(typeof result==="function"?result():result)||{status:'success',data:{notes:[],players:[],scopes:[]}}}]}};
+ const chrome={runtime:{onConnect:{addListener:fn=>onConnect=fn}},tabs:{create:async args=>{created.push(args);return {id:1}},get:async()=>{if(closed)throw Error();return {status,url:actual||created[0].url}}},scripting:{executeScript:async args=>{assert.equal(args.injectImmediately,true);return args.files?[]:[{result:(typeof result==="function"?result():result)||{status:'success',data:{notes:[],players:[],scopes:[]}}}]}}};
  vm.runInNewContext(readFileSync('.checks/extension-package/worker.js','utf8'),{chrome,URL,setTimeout:sleep,Date,console,atob});
  const port={name:'cs2-radar-v1',sender:{frameId:0,url:'https://cs2-radar-lab.moaniq12.chatgpt.site/'},postMessage:m=>sent.push(m),disconnect:()=>disconnect=true,onDisconnect:{addListener:()=>{}},onMessage:{addListener:fn=>listener=fn}};
  return {connect:(patch={})=>{Object.assign(port,patch);onConnect(port)},send:m=>listener(m),sent,created,get disconnected(){return disconnect}};
@@ -53,5 +53,12 @@ test('bundled extractor runs with browser globals and returns structured player 
  const context={URL,Date,atob,document:{title:'TEST stats | HLTV.org',querySelector:()=>null,documentElement:{outerHTML:html}},location:{href:'https://www.hltv.org/stats/players/10/test?event=8038'}};
  vm.createContext(context);vm.runInContext(readFileSync('.checks/extension-package/extractor.js','utf8'),context);
  const result=context.__cs2RadarExtract();assert.equal(result.status,'success');assert.equal(result.data.players[0].stats.event.adr,92.4);
+ context.document.readyState='loading';assert.equal(context.__cs2RadarExtract().status,'waiting');
+ context.document.readyState='interactive';assert.equal(context.__cs2RadarExtract().status,'success');
  context.document.title='Just a moment...';assert.equal(context.__cs2RadarExtract().status,'waiting');
+});
+test('statistics are returned while the tab is still loading advertising resources',async()=>{
+ const h=harness({status:'loading',sleep:()=>{throw Error('Must not wait for tab completion')}});h.connect();
+ await h.send({type:'import',id:'ads-still-loading',url:'https://www.hltv.org/matches/2396946/fut-vs-vitality-blast-open-porto-2026'});
+ assert.equal(h.sent.at(-1).type,'result');assert.equal(h.sent.at(-1).id,'ads-still-loading');
 });
