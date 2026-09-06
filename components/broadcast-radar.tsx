@@ -6,10 +6,11 @@ export function BroadcastRadar({metrics,a,b,nameA,nameB,drawKeys}:{metrics:Metri
  const [reference,setReference]=useState(true);
  const allowed=(m:Metric,s:Stats)=>Number.isFinite(s[m.key])&&(!drawKeys||drawKeys.includes(m.key));
  // Keep the reference grid identical between players and scopes. Values above
- // the reference maximum still use their real normalized distance and extend
- // beyond the fixed outer ring.
+ // the reference maximum extend beyond the fixed outer ring, while extreme
+ // values stop at one fixed display boundary so they cannot cover the labels.
  const radius=205,cx=500,cy=365;
- const point=(value:number,i:number)=>{const angle=-Math.PI/2+i*Math.PI/3;return [cx+Math.cos(angle)*radius*value/100,cy+Math.sin(angle)*radius*value/100]};
+ const displayLevel=(value:number)=>Math.min(value,115);
+ const point=(value:number,i:number)=>{const angle=-Math.PI/2+i*Math.PI/3,level=displayLevel(value);return [cx+Math.cos(angle)*radius*level/100,cy+Math.sin(angle)*radius*level/100]};
  const polygon=(s:Stats)=>metrics.map((m,i)=>point(normalized(s[m.key]!,m),i).join(',')).join(' ');
  const ring=(v:number)=>metrics.map((_,i)=>point(v,i).join(',')).join(' ');
  const positions:[[number,number,string],[number,number,string],[number,number,string],[number,number,string],[number,number,string],[number,number,string]]=[[500,65,'middle'],[720,235,'start'],[720,480,'start'],[500,620,'middle'],[280,480,'end'],[280,235,'end']];
@@ -29,6 +30,6 @@ export function BroadcastRadar({metrics,a,b,nameA,nameB,drawKeys}:{metrics:Metri
  {metrics.map((m,i)=>{const [x,y,anchor]=positions[i];return <g key={m.key} data-metric-value={m.key} textAnchor={anchor as 'start'|'end'|'middle'} fontFamily="Arial, Microsoft YaHei, sans-serif"><text x={x} y={y} fontSize="27" fill="#f0f3fa">{m.label} <tspan fontSize="33" fill="#bddbff">{format(a[m.key],m)}</tspan></text><text x={x} y={y+30} fontSize="21" fill="#c3ccdb">（{m.name}）</text><text x={x} y={y+54} fontSize="14" fill="#8096b3">圆心 {format(m.min,m)} · 外圈 {format(m.max,m)}</text>{b&&<text x={x} y={y+80} fontSize="24" fill="#61dac8">B {format(b[m.key],m)}</text>}</g>})}
  {[a,...(b?[b]:[])].map((s,i)=>{const value=s.swing,finite=Number.isFinite(value),y=770+i*62,width=finite?Math.abs(value!)/swingMax*220:0;return <g key={i} data-swing={i===0?'A':'B'}><line x1="270" y1={y} x2="730" y2={y} stroke="#7086a3" strokeOpacity=".35"/><rect x={value!<0?500-width:500} y={y-10} width={width} height="20" rx="2" fill={value!<0?'#f06469':'#22d559'} filter="url(#broadcast-glow)"/><line x1="500" y1={y-20} x2="500" y2={y+20} stroke="#e8eef8" strokeWidth="3"/><text x="500" y={y+42} textAnchor="middle" fontFamily="Arial, Microsoft YaHei, sans-serif" fontSize="24" fill={i===0?'#e9f2ff':'#61dac8'}>{b?(i===0?'A · ':'B · '):''}Round Swing <tspan fontWeight="600">{format(value,swingMetric)}</tspan></text></g>})}
  <text x="500" y={b?910:854} textAnchor="middle" fontSize="18" fontFamily="Arial, Microsoft YaHei, sans-serif" fill="#acbad0">回合影响 · 绿正 / 红负 · 0 为中线</text>
- <text x="500" y="932" textAnchor="middle" fontSize="16" fontFamily="Arial, Microsoft YaHei, sans-serif" fill="#899fbe">{reference?'橙线：截图参考值，非实时均值 · ':''}外圈为参考标准，可超出 · 缺失数据留空</text>
+ <text x="500" y="932" textAnchor="middle" fontSize="16" fontFamily="Arial, Microsoft YaHei, sans-serif" fill="#899fbe">{reference?'橙线：截图参考值，非实时均值 · ':''}外圈标准不变 · 极端值固定在圈外 · 原值保留</text>
  </svg></>;
 }

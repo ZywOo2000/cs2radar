@@ -55,4 +55,8 @@ test('reference grid stays the same size when a player exceeds the outer scale',
  const extremeChart=load(renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a:extreme,nameA:'EXTREME'})));
  assert.equal(standardChart('[data-reference-ring="100"]').attr('points'),extremeChart('[data-reference-ring="100"]').attr('points'));
  assert.notEqual(standardChart('[data-series="A"] polygon').attr('points'),extremeChart('[data-series="A"] polygon').attr('points'));
+ assert.match(standardChart('[data-reference-ring="100"]').attr('points'),/^500,160 /);
+ const points=extremeChart('[data-series="A"] circle').toArray().map(el=>({x:Number(extremeChart(el).attr('cx')),y:Number(extremeChart(el).attr('cy'))}));
+ assert.ok(points.every(({x,y})=>x>=295&&x<=705&&y>=129&&y<=601));
+ assert.match(extremeChart('svg').text(),/极端值固定在圈外 · 原值保留/);
 });
