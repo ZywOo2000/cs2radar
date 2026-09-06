@@ -6,7 +6,7 @@ import {parsePlayer,sourceUrl} from '../lib/hltv.ts';
 import {normalized,performance} from '../lib/stats.ts';
 function harness({result,actual,closed=false,sleep=setTimeout,status='complete',tabs=[],clock=Date}={}){
  let onConnect,listener,disconnect,installed=false;const sent=[],created=[],injections=[];
- const chrome={runtime:{onConnect:{addListener:fn=>onConnect=fn}},tabs:{query:async()=>tabs,create:async args=>{created.push(args);return {id:1}},get:async id=>{if(closed)throw Error();return {status,url:actual||tabs.find(t=>t.id===id)?.url||created[0].url}}},scripting:{executeScript:async args=>{assert.equal(args.injectImmediately,true);if(args.files){injections.push(args);installed=true;return []}return [{result:installed?((typeof result==="function"?result():result)||{status:'success',data:{notes:[],players:[],scopes:[]}}):{status:'not-injected'}}]}}};
+ const chrome={runtime:{onConnect:{addListener:fn=>onConnect=fn}},tabs:{query:async()=>tabs,create:async args=>{created.push(args);return {id:created.length}},get:async id=>{if(closed)throw Error();return {status,url:actual||tabs.find(t=>t.id===id)?.url||created[id-1].url}}},scripting:{executeScript:async args=>{assert.equal(args.injectImmediately,true);if(args.files){injections.push(args);installed=true;return []}return [{result:installed?((typeof result==="function"?result(args.target.tabId):result)||{status:'success',data:{notes:[],players:[],scopes:[]}}):{status:'not-injected'}}]}}};
  vm.runInNewContext(readFileSync('.checks/extension-package/worker.js','utf8'),{chrome,URL,setTimeout:sleep,Date:clock,console,atob});
  const port={name:'cs2-radar-v1',sender:{frameId:0,url:'https://cs2-radar-lab.moaniq12.chatgpt.site/'},postMessage:m=>sent.push(m),disconnect:()=>disconnect=true,onDisconnect:{addListener:()=>{}},onMessage:{addListener:fn=>listener=fn}};
  return {connect:(patch={})=>{Object.assign(port,patch);onConnect(port)},send:m=>listener(m),sent,created,injections,get disconnected(){return disconnect}};
@@ -78,4 +78,20 @@ test('statistics are returned while the tab is still loading advertising resourc
  const h=harness({status:'loading',sleep:()=>{throw Error('Must not wait for tab completion')}});h.connect();
  await h.send({type:'import',id:'ads-still-loading',url:'https://www.hltv.org/matches/2396946/fut-vs-vitality-blast-open-porto-2026'});
  assert.equal(h.sent.at(-1).type,'result');assert.equal(h.sent.at(-1).id,'ads-still-loading');
+});
+
+test('failed background detail requests fall back to an existing detail tab and fill MKs',async()=>{
+ const url='https://www.hltv.org/matches/2396950/mouz-vs-vitality-blast-open-porto-2026',detailUrl='https://www.hltv.org/stats/matches/130123/mouz-vs-vitality';
+ const base={sourceUrl:url,notes:[],players:[{id:'18221',stats:{all:{rounds:44,rating:1.61}}}],scopes:[{id:'all',name:'整场'}]};
+ const detail={sourceUrl:detailUrl,notes:[],players:[{id:'18221',stats:{all:{rounds:44,multiKillRounds:9}}}],scopes:[{id:'all',name:'整场'}]};
+ const h=harness({tabs:[{id:9,url:detailUrl}],result:id=>id===9?{status:'success',data:detail,parentMatchUrl:url}:{status:'success',data:base,remainingDetails:[{scope:'all',url:detailUrl,reason:'403'}]}});
+ h.connect();await h.send({type:'import',id:'fallback',url});
+ assert.equal(h.created.length,1);assert.equal(h.sent.at(-1).type,'result');assert.equal(h.sent.at(-1).data.players[0].stats.all.multiKillPct,9/44*100);assert.equal(h.sent.at(-1).data.players[0].stats.all.rating,1.61);
+});
+
+test('detail fallback never merges another match and keeps the original statistics',async()=>{
+ const url='https://www.hltv.org/matches/2396950/mouz-vs-vitality-blast-open-porto-2026',detailUrl='https://www.hltv.org/stats/matches/130123/mouz-vs-vitality';
+ const base={sourceUrl:url,notes:[],players:[{id:'18221',stats:{all:{rounds:44,rating:1.61}}}],scopes:[{id:'all'}]};
+ const h=harness({tabs:[{id:9,url:detailUrl}],result:id=>id===9?{status:'success',data:{sourceUrl:detailUrl,players:[],notes:[]},parentMatchUrl:url.replace('2396950','2396951')}:{status:'success',data:base,remainingDetails:[{scope:'all',url:detailUrl}]}});
+ h.connect();await h.send({type:'import',id:'wrong-detail',url});assert.equal(h.sent.at(-1).type,'result');assert.equal(base.players[0].stats.all.multiKillPct,undefined);assert.match(base.notes.join(' '),/不属于当前比赛/);
 });

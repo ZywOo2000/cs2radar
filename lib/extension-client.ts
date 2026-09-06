@@ -5,13 +5,14 @@ const channel='cs2-radar-v1';
 type Pending={resolve:(data:Dataset)=>void;reject:(e:Error)=>void;progress:(message:string)=>void;cleanup:()=>void};
 export function useHltvExtension(){
  const [connected,setConnected]=useState(false);
+ const [version,setVersion]=useState('');
  const pending=useRef(new Map<string,Pending>());
  function send(message:object){window.postMessage({channel,from:'website',...message},location.origin)}
  useEffect(()=>{
   const onMessage=(e:MessageEvent)=>{
    if(e.source!==window||e.origin!==location.origin||e.data?.channel!==channel||e.data.from!=='extension')return;
    const m=e.data;
-   if(m.type==='ready'){setConnected(true);return}
+   if(m.type==='ready'){setConnected(true);setVersion(typeof m.version==='string'?m.version:'未知');return}
    if(m.type==='disconnected'){setConnected(false);for(const p of pending.current.values()){p.cleanup();p.reject(new Error('扩展连接中断，请刷新网页后重试。'))}pending.current.clear();return}
    const p=pending.current.get(m.id);if(!p)return;
    if(m.type==='progress'){p.progress(String(m.message).slice(0,500));return}
@@ -41,5 +42,5 @@ export function useHltvExtension(){
    pending.current.set(id,{resolve,reject,progress,cleanup});send({type:'import',id,url});
   });
  }
- return {connected,request};
+ return {connected,version,request};
 }

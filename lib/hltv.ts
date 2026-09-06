@@ -115,8 +115,12 @@ export function matchDetailSources(html:string,u:URL,data:Dataset):{scope:string
 }
 export function mergeMatchDetails(data:Dataset,html:string,u:URL,scope:string):number{
  const $=load(html),back=$('a.match-page-link').attr('href');
- if(!back||safeLink(back,u)!==sourceUrl(data.sourceUrl).href)throw new ImportError('DETAIL_MISMATCH','详细统计不属于当前比赛，未合并。');
- const detail=parseMatch(html,u);let count=0;
+ return mergeMatchDataset(data,parseMatch(html,u),scope,back?safeLink(back,u):undefined);
+}
+export function mergeMatchDataset(data:Dataset,detail:Dataset,scope:string,parentUrl?:string):number{
+ const u=sourceUrl(detail.sourceUrl);
+ if(!parentUrl||sourceUrl(parentUrl).href!==sourceUrl(data.sourceUrl).href)throw new ImportError('DETAIL_MISMATCH','详细统计不属于当前比赛，未合并。');
+ let count=0;
  for(const p of data.players){const original=p.stats[scope],other=detail.players.find(q=>q.id===p.id),s=other?.stats[u.pathname.includes('/mapstatsid/')?'map':'all'];
   if(!original||!s||!Number.isInteger(s.multiKillRounds)||!original.rounds||s.rounds!==original.rounds)continue;
   original.multiKillRounds=s.multiKillRounds;derive(original);if(original.multiKillPct!==undefined)count++;
