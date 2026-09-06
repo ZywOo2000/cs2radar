@@ -37,6 +37,8 @@ test('percentage multi-kills and MK Rating stay separate and unlabelled counts a
 test('missing percentage keeps six labelled axes and does not draw a fake zero polygon',()=>{
  const a={kpr:.85,surviving:43,adr:85,kast:78,rating:1.3,swing:-.32};
  const html=renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a,nameA:'TEST'}));const $=load(html);
+ assert.deepEqual($('.radar-mode-button').map((_,el)=>$(el).text()).get(),['静态','动态']);
+ assert.equal($('.radar-mode-button').first().attr('aria-pressed'),'true');assert.equal($('svg').attr('data-display-mode'),'static');
  assert.equal($('[data-metric-value]').length,6);assert.match($('[data-metric-value="multiKillPct"]').text(),/—/);
  assert.equal($('[data-series="A"] polygon').length,0);assert.equal($('[data-series="A"] line').length,4);assert.equal($('[data-series="A"] circle').length,0);
  assert.equal($('[data-swing="A"] rect').attr('fill'),'#f06469');assert.doesNotMatch(html,/NaN|Infinity/);
