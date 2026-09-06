@@ -1,5 +1,5 @@
 import {pickRadarMotion,type RadarMotionKind} from './radar-motion';
-import {supportedVideoMime,videoFileName} from './export-video-utils';
+import {regularRevealPoints,supportedVideoMime,videoFileName} from './export-video-utils';
 
 export type ExportSide={name:string;context:string};
 export type VideoExportResult={format:'MP4'|'WebM';fileName:string;motion:RadarMotionKind};
@@ -41,8 +41,9 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
  if(!series.length)throw new Error('当前数据图没有可导出的数据区域。');
  const original=series.map(node=>({node,transform:node.getAttribute('transform'),clip:node.getAttribute('clip-path')}));
  const defs=clone.querySelector('defs')||clone.insertBefore(document.createElementNS(NS,'defs'),clone.firstChild);
- const clip=document.createElementNS(NS,'clipPath');clip.id='video-export-reveal';
- const reveal=document.createElementNS(NS,'circle');reveal.setAttribute('cx',String(center.x));reveal.setAttribute('cy',String(center.y));clip.appendChild(reveal);defs.appendChild(clip);
+ const clip=document.createElementNS(NS,'clipPath');clip.id='video-export-reveal';clip.setAttribute('clipPathUnits','userSpaceOnUse');
+ const reveal=document.createElementNS(NS,'polygon');clip.appendChild(reveal);defs.appendChild(clip);
+ const axisCount=Math.max(3,clone.querySelectorAll('[data-metric-value]').length);const revealRadius=Math.hypot(graphWidth,graphHeight)*1.15;
  const bars=[...clone.querySelectorAll<SVGRectElement>('[data-swing] rect')].map(node=>({node,x:Number(node.getAttribute('x')||500),width:Number(node.getAttribute('width')||0)}));
  const motion=pickRadarMotion();
  const setProgress=(raw:number)=>{
@@ -52,7 +53,7 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
    if(motion==='center'){node.setAttribute('transform',`translate(${center.x} ${center.y}) scale(${Math.max(.002,progress)}) translate(${-center.x} ${-center.y})`);node.removeAttribute('clip-path')}
    else{if(transform===null)node.removeAttribute('transform');else node.setAttribute('transform',transform);node.setAttribute('clip-path','url(#video-export-reveal)')}
   });
-  reveal.setAttribute('r',String(motion==='rings'?Math.hypot(graphWidth,graphHeight)*1.15*progress:0));
+  reveal.setAttribute('points',regularRevealPoints(axisCount,center.x,center.y,motion==='rings'?revealRadius*progress:0));
   bars.forEach(({node,x,width})=>{const current=width*progress;node.setAttribute('width',String(current));node.setAttribute('x',String(x<500?500-current:500))});
  };
 
