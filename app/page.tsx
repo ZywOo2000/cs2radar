@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {Crosshair,ArrowUpRight,Link2,ArrowLeftRight,Download,LoaderCircle,Info,X,Copy,TriangleAlert,Check,RotateCcw} from 'lucide-react';
+import {Crosshair,ArrowUpRight,Link2,ArrowLeftRight,Download,Video,LoaderCircle,Info,X,Copy,TriangleAlert,Check,RotateCcw} from 'lucide-react';
 import {Tabs,TabsList,TabsTrigger} from '@/components/ui/tabs';
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
 import {Table,TableHeader,TableHead,TableBody,TableCell,TableRow} from '@/components/ui/table';
@@ -8,6 +8,7 @@ import {TooltipProvider,Tooltip,TooltipTrigger,TooltipContent} from '@/component
 import {Radar} from '@/components/radar';
 import {performance,broadcastMetrics,broadcastStats,attributes,extraMetrics,demo,format,sharedMetrics,type Dataset,type Metric,type Stats,type Player} from '@/lib/stats';
 import {exportChart} from '@/lib/export-chart';
+import {exportDynamicVideo} from '@/lib/export-video';
 import {useHltvExtension} from '@/lib/extension-client';
 import {ExtensionGuide} from '@/components/extension-guide';
 type Transport='auto'|'server'|'extension';
@@ -25,9 +26,9 @@ function SourcePanel({side,slot,edit,load,choose,clear,copy,cancel}:{side:'a'|'b
  <div className="source-footer"><span className="status-dot"/>{slot.transport==='extension'?'浏览器扩展读取':'服务器直接读取'} · 不估算缺失指标</div></aside>
 }
 export default function Home(){
- const extension=useHltvExtension();const [transport,setTransport]=useState<Transport>('auto');const controllers=useRef<(AbortController|null)[]>([null,null]);
+ const extension=useHltvExtension();const [transport,setTransport]=useState<Transport>('auto');const controllers=useRef<(AbortController|null)[]>([null,null]);const videoExportLock=useRef(false);
  const [slots,setSlots]=useState<[Slot,Slot]>([empty(),empty()]);const ref=useRef(slots);const seq=useRef([0,0]);
- const [mode,setMode]=useState('compare'),[view,setView]=useState('performance'),[exporting,setExporting]=useState(false),[notice,setNotice]=useState('');
+ const [mode,setMode]=useState('compare'),[view,setView]=useState('performance'),[exporting,setExporting]=useState(false),[exportingVideo,setExportingVideo]=useState(false),[videoProgress,setVideoProgress]=useState(0),[notice,setNotice]=useState('');
  function update(i:number,patch:Partial<Slot>){const next=[...ref.current] as [Slot,Slot];next[i]={...next[i],...patch};ref.current=next;setSlots(next)}
  function replace(next:[Slot,Slot]){ref.current=next;setSlots(next)}
  async function fetchData(url:string,i:number,via:Transport):Promise<Dataset>{
@@ -64,6 +65,7 @@ export default function Home(){
  const tableMetrics=[...ms,...(view==='performance'?[...performance.filter(m=>!ms.some(x=>x.key===m.key)),...extraMetrics]:[])];
  const ratingMismatch=comp&&pa&&pb&&((pa.ratingVersion!==pb.ratingVersion)||pa.ratingVersion==='未标注');
  async function download(){setExporting(true);setNotice('');try{if(!pa)throw new Error('请先选择选手。');await exportChart(view==='performance'?'选手比赛表现':'HLTV 选手属性',view==='performance'?[...ms,performance.find(m=>m.key==='swing')!]:comparable,{name:pa.name,context:context(a),source:pa.profileUrl||a.data?.sourceUrl||'',version:pa.ratingVersion,stats:sa,demo:!!a.data?.demo},comp&&pb?{name:pb.name,context:context(b),source:pb.profileUrl||b.data?.sourceUrl||'',version:pb.ratingVersion,stats:sb,demo:!!b.data?.demo}:undefined);setNotice('PNG 已生成，浏览器将开始下载。')}catch(e){setNotice(e instanceof Error?e.message:'导出失败。')}finally{setExporting(false)}}
+ async function downloadVideo(){if(videoExportLock.current)return;videoExportLock.current=true;setExportingVideo(true);setVideoProgress(0);setNotice('');try{if(!pa)throw new Error('请先选择选手。');const result=await exportDynamicVideo(view==='performance'?'选手比赛表现':'HLTV 选手属性',{name:pa.name,context:context(a)},comp&&pb?{name:pb.name,context:context(b)}:undefined,setVideoProgress);setNotice(`动态视频已生成：${result.fileName}（${result.format}，浏览器将开始下载）`)}catch(e){setNotice(e instanceof Error?e.message:'视频导出失败，请重试。')}finally{videoExportLock.current=false;setExportingVideo(false);setVideoProgress(0)}}
  const actions=useRef({load,choose});actions.current={load,choose};
  const configRef=useRef({mode,view});configRef.current={mode,view};
  useEffect(()=>{
@@ -77,7 +79,7 @@ export default function Home(){
   ];for(const tool of tools)try{void Promise.resolve(ctx.registerTool(tool,{signal:life.signal})).catch(()=>{})}catch{}return()=>life.abort();
  },[]);
  return <TooltipProvider><main className="site-shell"><header className="topbar"><a className="brand" href="/"><span className="brand-mark"><Crosshair size={23}/></span><b>RADAR<span> / CS2</span></b></a><span className="top-note">HLTV 选手数据可视化</span><a className="quiet-link" href="https://www.hltv.org/stats" target="_blank" rel="noreferrer">HLTV <ArrowUpRight size={16}/></a></header>
- <section className="workspace-heading"><div><div className="eyebrow">PLAYER COMPARISON</div><h1>选手数据对比<span className="heading-dot">.</span></h1><p>独立选择两份数据，对比每一次赛场表现。</p></div><div className="heading-actions"><button className="button secondary" onClick={showDemo} disabled={busy}><RotateCcw size={15}/>查看示例</button><button className="button secondary export-button" onClick={download} disabled={!ready||exporting||busy}>{exporting?<LoaderCircle size={16} className="spin"/>:<Download size={16}/>}导出 PNG</button></div></section>
+ <section className="workspace-heading"><div><div className="eyebrow">PLAYER COMPARISON</div><h1>选手数据对比<span className="heading-dot">.</span></h1><p>独立选择两份数据，对比每一次赛场表现。</p></div><div className="heading-actions"><button className="button secondary" onClick={showDemo} disabled={busy||exportingVideo}><RotateCcw size={15}/>查看示例</button><div className="export-actions"><button className="button secondary export-button" onClick={download} disabled={!ready||exporting||exportingVideo||busy}>{exporting?<LoaderCircle size={16} className="spin"/>:<Download size={16}/>}导出 PNG</button><button className="button secondary export-button video-export-button" onClick={downloadVideo} disabled={!ready||exporting||exportingVideo||busy} aria-live="polite">{exportingVideo?<LoaderCircle size={16} className="spin"/>:<Video size={16}/>}<span>{exportingVideo?`正在生成视频… ${videoProgress}%`:'导出动态视频'}</span></button></div></div></section>
  <div className="extension-bar"><div><strong>{extension.connected?'扩展已连接 · v'+extension.version:'扩展未连接'}</strong><p>{extension.connected&&['1.0.0','1.0.1','1.0.2','1.0.3'].includes(extension.version)?'当前为旧版扩展，请下载新版、重新加载扩展，再刷新本页。':'补读多杀时可能打开详细统计页；如需验证，请在该页完成。'}</p></div><Picker label="读取方式" id="transport" value={transport} items={[{value:'auto',label:'自动 · 扩展优先'},{value:'extension',label:'仅浏览器扩展'},{value:'server',label:'仅服务器'}]} onChange={v=>setTransport(v as Transport)} disabled={busy}/><ExtensionGuide connected={extension.connected}/></div>
  <div className="workspace-toolbar"><Tabs value={mode} onValueChange={v=>setMode(String(v))}><TabsList className="mode-tabs"><TabsTrigger value="compare"><ArrowLeftRight size={15}/>双人对比</TabsTrigger><TabsTrigger value="single">单人展示</TabsTrigger></TabsList></Tabs><div className="toolbar-right"><span className="muted small">跨比赛 · 跨赛事 · 同一选手</span>{comp&&<button className="icon-button" aria-label="交换两份数据" disabled={busy||(!a.data&&!b.data)} onClick={()=>replace([b,a])}><ArrowLeftRight size={17}/></button>}</div></div>
  {notice&&<div className="notice" role="status"><Info size={15}/><span>{notice}</span><button className="icon-button" aria-label="关闭提示" onClick={()=>setNotice('')}><X size={14}/></button></div>}
