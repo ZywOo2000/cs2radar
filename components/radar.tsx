@@ -3,10 +3,10 @@ import {useState} from 'react';
 import {type Metric,type Stats,normalized,format} from '@/lib/stats';
 import {BroadcastRadar} from './broadcast-radar';
 import {RadarModeControls,useRadarMotion} from './radar-motion-controls';
-export function Radar({metrics,a,b,nameA,nameB,drawKeys}:{metrics:Metric[];a:Stats;b?:Stats;nameA:string;nameB?:string;drawKeys?:string[]}){
+export function Radar({metrics,a,b,nameA,nameB,drawKeys,dataKey}:{metrics:Metric[];a:Stats;b?:Stats;nameA:string;nameB?:string;drawKeys?:string[];dataKey?:string}){
  const [hover,setHover]=useState<number|null>(null);const n=metrics.length;
- const motion=useRadarMotion();
- if(metrics.some(m=>m.key==='multiKillPct'))return <BroadcastRadar metrics={metrics} a={a} b={b} nameA={nameA} nameB={nameB} drawKeys={drawKeys}/>;
+ const motion=useRadarMotion(dataKey||[nameA,nameB,...metrics.flatMap(m=>[a[m.key],b?.[m.key]])].join('|'));
+ if(metrics.some(m=>m.key==='multiKillPct'))return <BroadcastRadar metrics={metrics} a={a} b={b} nameA={nameA} nameB={nameB} drawKeys={drawKeys} dataKey={dataKey}/>;
  // Both polygons share the same reference ring and viewport expansion.
  const maximum=Math.max(100,...[a,b].filter(Boolean).flatMap(s=>metrics.map(m=>Number.isFinite(s![m.key])?normalized(s![m.key]!,m):0)));
  const referenceRadius=150/(maximum/100);

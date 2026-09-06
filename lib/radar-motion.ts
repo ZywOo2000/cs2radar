@@ -8,4 +8,6 @@ export const pickRadarMotion=(random:()=>number=Math.random):RadarMotionKind=>ra
 
 export const replayRadarMotion=(state:RadarMotionState,kind:RadarMotionKind):RadarMotionState=>({mode:'dynamic',kind,runId:state.runId+1});
 
+export const refreshDynamicRadar=(state:RadarMotionState,kind:RadarMotionKind):RadarMotionState=>state.mode==='dynamic'?replayRadarMotion(state,kind):state;
+
 export const stopRadarMotion=(state:RadarMotionState):RadarMotionState=>({...state,mode:'static'});

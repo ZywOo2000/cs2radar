@@ -3,9 +3,9 @@ import {useState} from 'react';
 import {format,normalized,screenshotReference,performance,type Metric,type Stats} from '@/lib/stats';
 import {RadarModeControls,useRadarMotion} from './radar-motion-controls';
 
-export function BroadcastRadar({metrics,a,b,nameA,nameB,drawKeys}:{metrics:Metric[];a:Stats;b?:Stats;nameA:string;nameB?:string;drawKeys?:string[]}){
+export function BroadcastRadar({metrics,a,b,nameA,nameB,drawKeys,dataKey}:{metrics:Metric[];a:Stats;b?:Stats;nameA:string;nameB?:string;drawKeys?:string[];dataKey?:string}){
  const [reference,setReference]=useState(true);
- const motion=useRadarMotion();
+ const motion=useRadarMotion(dataKey||[nameA,nameB,...metrics.flatMap(m=>[a[m.key],b?.[m.key]])].join('|'));
  const allowed=(m:Metric,s:Stats)=>Number.isFinite(s[m.key])&&(!drawKeys||drawKeys.includes(m.key));
  // Keep the reference grid identical between players and scopes. Values above
  // the reference maximum still use their real normalized distance and extend

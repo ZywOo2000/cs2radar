@@ -1,13 +1,15 @@
 'use client';
-import {useCallback,useId,useState} from 'react';
-import {initialRadarMotion,pickRadarMotion,replayRadarMotion,stopRadarMotion} from '@/lib/radar-motion';
+import {useCallback,useEffect,useId,useRef,useState} from 'react';
+import {initialRadarMotion,pickRadarMotion,refreshDynamicRadar,replayRadarMotion,stopRadarMotion} from '@/lib/radar-motion';
 
-export function useRadarMotion(){
+export function useRadarMotion(dataKey=''){
  const [state,setState]=useState(initialRadarMotion);
+ const previousDataKey=useRef(dataKey);
  const rawId=useId();
  const revealId=('radar-reveal-'+rawId).replace(/[^a-zA-Z0-9_-]/g,'');
  const showStatic=useCallback(()=>setState(stopRadarMotion),[]);
  const playDynamic=useCallback(()=>{const kind=pickRadarMotion();setState(current=>replayRadarMotion(current,kind))},[]);
+ useEffect(()=>{if(previousDataKey.current===dataKey)return;previousDataKey.current=dataKey;const kind=pickRadarMotion();setState(current=>refreshDynamicRadar(current,kind))},[dataKey]);
  return {...state,revealId,showStatic,playDynamic};
 }
 
