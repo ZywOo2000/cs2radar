@@ -38,13 +38,14 @@ test('missing percentage keeps six labelled axes and does not draw a fake zero p
  const a={kpr:.85,surviving:43,adr:85,kast:78,rating:1.3,swing:-.32};
  const html=renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a,nameA:'TEST'}));const $=load(html);
  assert.equal($('[data-metric-value]').length,6);assert.match($('[data-metric-value="multiKillPct"]').text(),/—/);
- assert.equal($('[data-series="A"] polygon').length,0);assert.equal($('[data-series="A"] circle').length,5);
+ assert.equal($('[data-series="A"] polygon').length,0);assert.equal($('[data-series="A"] line').length,4);assert.equal($('[data-series="A"] circle').length,0);
  assert.equal($('[data-swing="A"] rect').attr('fill'),'#f06469');assert.doesNotMatch(html,/NaN|Infinity/);
 });
 test('complete dual comparison retains values and separate positive/negative swing bars in exported SVG',()=>{
  const a={kpr:1,surviving:50,adr:99,kast:80,multiKillPct:25,rating:1.5,swing:3.5},b={...a,rating:1.2,swing:-.32};
  const $=load(renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a,b,nameA:'A',nameB:'B'})));
  assert.equal($('[data-series="A"] polygon').length,1);assert.equal($('[data-series="B"] polygon').length,1);
+ assert.equal($('[data-series="A"] circle, [data-series="B"] circle').length,0);
  assert.match($('[data-metric-value="rating"]').text(),/1.50.*1.30.*1.20/);
  assert.equal($('[data-swing="A"] rect').attr('fill'),'#22d559');assert.equal($('[data-swing="B"] rect').attr('fill'),'#f06469');
 });
