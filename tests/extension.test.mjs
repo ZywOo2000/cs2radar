@@ -4,12 +4,12 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {parsePlayer,sourceUrl} from '../lib/hltv.ts';
 import {normalized,performance} from '../lib/stats.ts';
-function harness({result,actual,closed=false,sleep=setTimeout,status='complete'}={}){
- let onConnect,listener,disconnect;const sent=[],created=[];
- const chrome={runtime:{onConnect:{addListener:fn=>onConnect=fn}},tabs:{create:async args=>{created.push(args);return {id:1}},get:async()=>{if(closed)throw Error();return {status,url:actual||created[0].url}}},scripting:{executeScript:async args=>{assert.equal(args.injectImmediately,true);return args.files?[]:[{result:(typeof result==="function"?result():result)||{status:'success',data:{notes:[],players:[],scopes:[]}}}]}}};
- vm.runInNewContext(readFileSync('.checks/extension-package/worker.js','utf8'),{chrome,URL,setTimeout:sleep,Date,console,atob});
+function harness({result,actual,closed=false,sleep=setTimeout,status='complete',tabs=[],clock=Date}={}){
+ let onConnect,listener,disconnect,installed=false;const sent=[],created=[],injections=[];
+ const chrome={runtime:{onConnect:{addListener:fn=>onConnect=fn}},tabs:{query:async()=>tabs,create:async args=>{created.push(args);return {id:1}},get:async id=>{if(closed)throw Error();return {status,url:actual||tabs.find(t=>t.id===id)?.url||created[0].url}}},scripting:{executeScript:async args=>{assert.equal(args.injectImmediately,true);if(args.files){injections.push(args);installed=true;return []}return [{result:installed?((typeof result==="function"?result():result)||{status:'success',data:{notes:[],players:[],scopes:[]}}):{status:'not-injected'}}]}}};
+ vm.runInNewContext(readFileSync('.checks/extension-package/worker.js','utf8'),{chrome,URL,setTimeout:sleep,Date:clock,console,atob});
  const port={name:'cs2-radar-v1',sender:{frameId:0,url:'https://cs2-radar-lab.moaniq12.chatgpt.site/'},postMessage:m=>sent.push(m),disconnect:()=>disconnect=true,onDisconnect:{addListener:()=>{}},onMessage:{addListener:fn=>listener=fn}};
- return {connect:(patch={})=>{Object.assign(port,patch);onConnect(port)},send:m=>listener(m),sent,created,get disconnected(){return disconnect}};
+ return {connect:(patch={})=>{Object.assign(port,patch);onConnect(port)},send:m=>listener(m),sent,created,injections,get disconnected(){return disconnect}};
 }
 test('extension rejects other sites and subframes before creating tabs',()=>{
  for(const sender of [{frameId:0,url:'https://evil.test/'},{frameId:1,url:'https://cs2-radar-lab.moaniq12.chatgpt.site/'}]){const h=harness();h.connect({sender});assert.equal(h.disconnected,true);assert.equal(h.created.length,0)}
@@ -41,6 +41,23 @@ test('challenge progress resumes automatically and keeps the request id',async()
  let passes=0;const h=harness({result:()=>++passes===1?{status:'waiting',message:'请完成验证'}:{status:'success',data:{notes:[]}},sleep:fn=>setTimeout(fn,0)});
  h.connect();await h.send({type:'import',id:'challenge',url:'https://www.hltv.org/events/8038/example'});
  assert.ok(h.sent.some(m=>m.type==='progress'&&m.message==='请完成验证'));assert.equal(h.sent.at(-1).type,'result');assert.equal(h.sent.at(-1).id,'challenge');
+ assert.equal(h.injections.length,1);
+});
+
+test('an already open exact event filter is read without opening or reloading a tab',async()=>{
+ const url='https://www.hltv.org/stats/players?event=8038';const h=harness({tabs:[{id:9,url}]});h.connect();
+ await h.send({type:'import',id:'reuse',url});assert.equal(h.created.length,0);assert.equal(h.sent.at(-1).type,'result');assert.equal(h.injections[0].target.tabId,9);
+});
+
+test('a different event filter is never reused',async()=>{
+ const h=harness({tabs:[{id:9,url:'https://www.hltv.org/stats/players?event=999'}]});h.connect();
+ await h.send({type:'import',id:'distinct',url:'https://www.hltv.org/stats/players?event=8038'});assert.equal(h.created.length,1);assert.equal(h.sent.at(-1).type,'result');
+});
+
+test('persistent missing statistics fail early instead of waiting three minutes',async()=>{
+ let now=1000;const h=harness({clock:{now:()=>now},result:{status:'error',message:'没有统计'},sleep:fn=>{now+=200;return setTimeout(fn,0)}});h.connect();
+ await h.send({type:'import',id:'no-stats',url:'https://www.hltv.org/stats/players?event=8038'});
+ assert.equal(h.sent.at(-1).type,'error');assert.match(h.sent.at(-1).message,/10 秒/);assert.ok(now<15000);assert.equal(h.injections.length,1);
 });
 test('cancelled verification never emits a later success',async()=>{
  const h=harness({result:{status:'waiting',message:'请完成验证'},sleep:fn=>setTimeout(fn,0)});h.connect();
