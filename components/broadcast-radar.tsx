@@ -5,8 +5,10 @@ import {format,normalized,screenshotReference,performance,type Metric,type Stats
 export function BroadcastRadar({metrics,a,b,nameA,nameB,drawKeys}:{metrics:Metric[];a:Stats;b?:Stats;nameA:string;nameB?:string;drawKeys?:string[]}){
  const [reference,setReference]=useState(true);
  const allowed=(m:Metric,s:Stats)=>Number.isFinite(s[m.key])&&(!drawKeys||drawKeys.includes(m.key));
- const maximum=Math.max(100,...[a,b].filter(Boolean).flatMap(s=>metrics.map(m=>allowed(m,s!)?normalized(s![m.key]!,m):0)));
- const radius=205/(maximum/100),cx=500,cy=365;
+ // Keep the reference grid identical between players and scopes. Values above
+ // the reference maximum still use their real normalized distance and extend
+ // beyond the fixed outer ring.
+ const radius=205,cx=500,cy=365;
  const point=(value:number,i:number)=>{const angle=-Math.PI/2+i*Math.PI/3;return [cx+Math.cos(angle)*radius*value/100,cy+Math.sin(angle)*radius*value/100]};
  const polygon=(s:Stats)=>metrics.map((m,i)=>point(normalized(s[m.key]!,m),i).join(',')).join(' ');
  const ring=(v:number)=>metrics.map((_,i)=>point(v,i).join(',')).join(' ');
@@ -21,7 +23,7 @@ export function BroadcastRadar({metrics,a,b,nameA,nameB,drawKeys}:{metrics:Metri
  return <><div className="broadcast-controls"><button className="text-button" aria-pressed={reference} onClick={()=>setReference(v=>!v)}>{reference?'隐藏截图参考线':'显示截图参考线'}</button></div><svg id="performance-radar" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 960" className="radar-svg broadcast-svg" role="img" aria-label={nameA+(b?' 与 '+nameB:'')+'，六项数据雷达图及 Round Swing 正负条形'}>
  <defs><linearGradient id="broadcast-bg" x2=".8" y2="1"><stop stopColor="#080c18"/><stop offset="1" stopColor="#11213e"/></linearGradient><radialGradient id="broadcast-blue"><stop stopColor="#086bce" stopOpacity=".48"/><stop offset="1" stopColor="#0858a5" stopOpacity="0"/></radialGradient><linearGradient id="broadcast-frame"><stop stopColor="#e0eafa" stopOpacity=".8"/><stop offset=".45" stopColor="#a4c9ff" stopOpacity=".15"/><stop offset="1" stopColor="#689bd2" stopOpacity=".3"/></linearGradient><filter id="broadcast-glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
  <rect width="1000" height="960" rx="30" fill="url(#broadcast-bg)"/><ellipse cx="760" cy="780" rx="490" ry="380" fill="url(#broadcast-blue)"/><ellipse cx="170" cy="500" rx="340" ry="260" fill="url(#broadcast-blue)" opacity=".4"/>{dots.map((d,i)=><circle key={i} {...d} cx={d.x} cy={d.y} fill="#75c7ff" opacity={i%3===0?.5:.16}/>)}<rect x="10" y="10" width="980" height="940" rx="30" fill="#080c18" fillOpacity=".28" stroke="url(#broadcast-frame)" strokeWidth="2"/>
- {[20,40,60,80,100].map(v=><polygon key={v} points={ring(v)} fill="none" stroke={v===100?'#a9d0ff':'#c7d3e2'} strokeOpacity={v===100?1:.2+v/150} strokeWidth={v===100?2.8:1.5} filter={v===100?'url(#broadcast-glow)':undefined}/>)}
+ {[20,40,60,80,100].map(v=><polygon key={v} data-reference-ring={v} points={ring(v)} fill="none" stroke={v===100?'#a9d0ff':'#c7d3e2'} strokeOpacity={v===100?1:.2+v/150} strokeWidth={v===100?2.8:1.5} filter={v===100?'url(#broadcast-glow)':undefined}/>)}
  {reference&&<polygon data-series="screenshot-reference" points={polygon(screenshotReference)} fill="none" stroke="#ed948a" strokeWidth="2" opacity=".88" filter="url(#broadcast-glow)"/>}
  {b&&draw(b,'#61dac8','B')}{draw(a,'#bddbff','A')}
  {metrics.map((m,i)=>{const [x,y,anchor]=positions[i];return <g key={m.key} data-metric-value={m.key} textAnchor={anchor as 'start'|'end'|'middle'} fontFamily="Arial, Microsoft YaHei, sans-serif"><text x={x} y={y} fontSize="27" fill="#f0f3fa">{m.label} <tspan fontSize="33" fill="#bddbff">{format(a[m.key],m)}</tspan></text><text x={x} y={y+30} fontSize="21" fill="#c3ccdb">（{m.name}）</text><text x={x} y={y+54} fontSize="14" fill="#8096b3">圆心 {format(m.min,m)} · 外圈 {format(m.max,m)}</text>{b&&<text x={x} y={y+80} fontSize="24" fill="#61dac8">B {format(b[m.key],m)}</text>}</g>})}

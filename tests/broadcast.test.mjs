@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
+import {resolve} from 'node:path';
 import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {load} from 'cheerio/slim';
 import {broadcastMetrics,broadcastStats,normalized} from '../lib/stats.ts';
 import {parsePlayer,sourceUrl} from '../lib/hltv.ts';
 
-await build({entryPoints:['components/broadcast-radar.tsx'],outfile:'.checks/broadcast-component.mjs',bundle:true,platform:'node',format:'esm',packages:'external'});
+await build({entryPoints:['components/broadcast-radar.tsx'],outfile:'.checks/broadcast-component.mjs',bundle:true,platform:'node',format:'esm',packages:'external',jsx:'automatic',alias:{'@':resolve('.')}});
 const {BroadcastRadar}=await import('../.checks/broadcast-component.mjs');
 test('reference screenshot thresholds all land on the same outer ring and permit overflow',()=>{
  assert.deepEqual(broadcastMetrics.map(m=>m.max),[.85,43,85,78,20,1.3]);
@@ -46,4 +47,12 @@ test('complete dual comparison retains values and separate positive/negative swi
  assert.equal($('[data-series="A"] polygon').length,1);assert.equal($('[data-series="B"] polygon').length,1);
  assert.match($('[data-metric-value="rating"]').text(),/1.50.*1.30.*1.20/);
  assert.equal($('[data-swing="A"] rect').attr('fill'),'#22d559');assert.equal($('[data-swing="B"] rect').attr('fill'),'#f06469');
+});
+test('reference grid stays the same size when a player exceeds the outer scale',()=>{
+ const standard={kpr:.85,surviving:43,adr:85,kast:78,multiKillPct:20,rating:1.3,swing:0};
+ const extreme={kpr:1.5,surviving:60,adr:153.2,kast:88.9,multiKillPct:61.1,rating:2.38,swing:8};
+ const standardChart=load(renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a:standard,nameA:'STANDARD'})));
+ const extremeChart=load(renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a:extreme,nameA:'EXTREME'})));
+ assert.equal(standardChart('[data-reference-ring="100"]').attr('points'),extremeChart('[data-reference-ring="100"]').attr('points'));
+ assert.notEqual(standardChart('[data-series="A"] polygon').attr('points'),extremeChart('[data-series="A"] polygon').attr('points'));
 });
