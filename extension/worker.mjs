@@ -34,7 +34,7 @@ chrome.runtime.onConnect.addListener(port=>{
  const send=m=>{try{port.postMessage(m)}catch{}};
  port.onDisconnect.addListener(()=>{for(const j of jobs.values())j.cancelled=true;jobs.clear()});
  port.onMessage.addListener(async m=>{
-  if(m.type==='hello'){send({type:'ready',version:'1.0.4'});return}
+  if(m.type==='hello'){send({type:'ready',version:'1.0.5'});return}
   if(m.type==='ping')return;
   if(m.type==='cancel'){const j=jobs.get(m.id);if(j)j.cancelled=true;return}
   if(m.type!=='import'||typeof m.id!=='string'||m.id.length>80)return;

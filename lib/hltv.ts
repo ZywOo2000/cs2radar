@@ -148,6 +148,20 @@ export function parsePlayer(html:string,u:URL):Dataset{
  const name=txt($('.summaryNickname,.playerNickname').first().text())||txt($('.context-item-name').first().text());
  if(!name)throw new ImportError('NO_STATS','无法识别该选手统计页面，未导入数据。');
  let v='未标注';
+ // Current HLTV summary labels include nested explanatory tooltips. Read the
+ // explicit raw-data siblings, not the tooltip text or hidden eco-adjusted values.
+ $('.player-summary-stat-box-data-wrapper').each((_,el)=>{
+  const box=$(el);if(box.closest('.stats-side-ct,.stats-side-t,[data-side="ct"],[data-side="t"]').length)return;
+  const nameNode=box.children('.player-summary-stat-box-data-text').not('.ecoAdjustedData').first().clone();nameNode.find('.player-summary-tooltip').remove();
+  const k=keyFor(nameNode.text()),raw=box.children('.player-summary-stat-box-data').not('.ecoAdjustedData').first().text();
+  const val=k==='multiKillPct'&&!raw.includes('%')?undefined:number(raw);
+  if(k&&val!==undefined){stats[k]=val;if(k==='rating')v=version(nameNode.text())}
+ });
+ $('.role-stats-section-title-wrapper.stats-side-combined').each((_,el)=>{
+  const title=$(el).find('.role-stats-section-title').first(),clean=title.clone();clean.children().remove();
+  const k=keyFor(clean.text()),val=number(title.find('.row-stats-section-score').first().text());
+  if(k&&['firepower','entrying','trading','opening','clutching','sniping','utility'].includes(k)&&val!==undefined&&val>=0&&val<=100)stats[k]=val;
+ });
  $('.stats-row').each((_,el)=>{const row=$(el),spans=row.children('span'),k=keyFor(spans.first().text());const rawValue=spans.last().text();const val=k==='multiKillPct'&&!rawValue.includes('%')?undefined:number(rawValue);if(k&&val!==undefined)stats[k]=val;if(k==='rating')v=version(spans.first().text())});
  // Summary boxes use explicit labels; do not read T / CT values as the overall rating.
  $('.summaryStatBreakdown,.summaryStatBreakdownContainer,.summary-stat,.summaryStat').each((_,el)=>{
@@ -172,7 +186,7 @@ export function parsePlayer(html:string,u:URL):Dataset{
   stats[k]=val;if(k==='rating')v=version(raw);
  });
  derive(stats);if(Object.keys(stats).length<2)throw new ImportError('NO_STATS','选手页面缺少可识别的统计字段，未导入数据。');
- out.scopes=[{id:'event',name:'整届赛事'}];out.players=[{id,name,team:txt($('.SummaryTeamname,.summaryTeamname').first().text())||'战队未提供',ratingVersion:v,profileUrl:u.href,detailLoaded:true,stats:{event:stats}}];
+ out.scopes=[{id:'event',name:'整届赛事'}];out.players=[{id,name,team:txt($('.SummaryTeamname,.summaryTeamname').first().text())||$('.player-summary-stat-box-left-team-logo').first().attr('title')||'战队未提供',ratingVersion:v,profileUrl:u.href,detailLoaded:true,stats:{event:stats}}];
  out.notes=['只使用此链接赛事筛选范围内的数据。页面未提供的指标显示为缺失。'];return out;
 }
 export async function importHltv(input:unknown,fetcher:typeof fetch=fetch):Promise<Dataset>{
