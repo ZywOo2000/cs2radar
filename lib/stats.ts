@@ -24,12 +24,12 @@ export const extraMetrics:Metric[] = [
 ];
 export const normalized=(value:number,m:Metric)=>Math.max(0,(m.inverse?1-(value-m.min)/(m.max-m.min):(value-m.min)/(m.max-m.min))*100);
 export const broadcastMetrics:Metric[]=[
- {key:'kpr',label:'KPR',name:'回合击杀',min:0,max:.85,decimals:2,description:'每回合击杀数；参考满刻度 0.85。'},
- {key:'surviving',label:'Surviving',name:'存活率',min:0,max:43,decimals:2,unit:'%',description:'存活回合占比。优先由总回合和死亡数计算；仅有 DPR 时由 (1−DPR)×100 换算，受来源舍入影响。参考满刻度 43%。'},
- {key:'adr',label:'ADR',name:'回合伤害',min:0,max:85,decimals:2,description:'平均回合伤害；参考满刻度 85。'},
- {key:'kast',label:'KAST',name:'回合贡献率',min:0,max:78,decimals:2,unit:'%',description:'有击杀、助攻、存活或被补枪的回合占比；参考满刻度 78%。'},
- {key:'multiKillPct',label:'Multi-kill',name:'多杀回合占比',min:0,max:20,decimals:2,unit:'%',description:'一回合至少取得两次击杀的回合占比，参考满刻度 20%。与 MK Rating 不同；缺失时不推算。'},
- {key:'rating',label:'Rating',name:'综合评分',min:0,max:1.3,decimals:2,description:'HLTV 原始综合评分；参考满刻度 1.30，版本不同不共同比较。'},
+ {key:'kpr',label:'KPR',name:'回合击杀',min:.42,max:.85,decimals:2,description:'每回合击杀数；圆心 0.42，参考外圈 0.85。'},
+ {key:'surviving',label:'Surviving',name:'存活率',min:15.7,max:43,decimals:2,unit:'%',description:'存活回合占比。优先由总回合和死亡数计算；仅有 DPR 时由 (1−DPR)×100 换算，受来源舍入影响。圆心 15.7%，参考外圈 43%。'},
+ {key:'adr',label:'ADR',name:'回合伤害',min:47.5,max:85,decimals:2,description:'平均回合伤害；圆心 47.5，参考外圈 85。'},
+ {key:'kast',label:'KAST',name:'回合贡献率',min:54.5,max:78,decimals:2,unit:'%',description:'有击杀、助攻、存活或被补枪的回合占比；圆心 54.5%，参考外圈 78%。'},
+ {key:'multiKillPct',label:'Multi-kill',name:'多杀回合占比',min:7,max:20,decimals:2,unit:'%',description:'一回合至少取得两次击杀的回合占比，圆心 7%，参考外圈 20%。与 MK Rating 不同；缺失时不推算。'},
+ {key:'rating',label:'Rating',name:'综合评分',min:.55,max:1.3,decimals:2,description:'HLTV 原始综合评分；圆心 0.55，参考外圈 1.30，版本不同不共同比较。'},
 ];
 export const screenshotReference:Stats={kpr:.65,surviving:32.54,adr:70.58,kast:70.98,multiKillPct:15.22,rating:1,swing:-.32};
 export function broadcastStats(input:Stats):Stats{

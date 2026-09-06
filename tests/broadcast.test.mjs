@@ -11,7 +11,14 @@ await build({entryPoints:['components/broadcast-radar.tsx'],outfile:'.checks/bro
 const {BroadcastRadar}=await import('../.checks/broadcast-component.mjs');
 test('reference screenshot thresholds all land on the same outer ring and permit overflow',()=>{
  assert.deepEqual(broadcastMetrics.map(m=>m.max),[.85,43,85,78,20,1.3]);
- for(const m of broadcastMetrics){assert.equal(normalized(m.max,m),100);assert.equal(normalized(m.max*2,m),200)}
+ assert.deepEqual(broadcastMetrics.map(m=>m.min),[.42,15.7,47.5,54.5,7,.55]);
+ for(const m of broadcastMetrics){
+  assert.equal(normalized(m.min,m),0);assert.equal(normalized(m.min-1,m),0);
+  assert.ok(Math.abs(normalized((m.min+m.max)/2,m)-50)<1e-9);
+  assert.equal(normalized(m.max,m),100);
+  assert.ok(Math.abs(normalized(m.max+(m.max-m.min),m)-200)<1e-9);
+ }
+ assert.ok(Math.abs(normalized(1,broadcastMetrics.find(m=>m.key==='rating'))-60)<1e-9);
 });
 test('survival uses exact counts before rounded DPR, preserves zero, and never invents multi-kill',()=>{
  assert.equal(broadcastStats({rounds:100,deaths:57,dpr:.6}).surviving,43);
