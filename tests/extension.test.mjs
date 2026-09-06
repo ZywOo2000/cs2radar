@@ -65,14 +65,14 @@ test('cancelled verification never emits a later success',async()=>{
  await new Promise(r=>setTimeout(r,1));await h.send({type:'cancel',id:'cancel-me'});await running;
  assert.equal(h.sent.some(m=>m.type==='result'||m.type==='error'),false);
 });
-test('bundled extractor runs with browser globals and returns structured player data',()=>{
+test('bundled extractor runs with browser globals and returns structured player data',async()=>{
  const html='<span class="summaryNickname">TEST</span><div class="stats-row"><span>Rating 3.0</span><span>1.34</span></div><div class="stats-row"><span>Damage / Round</span><span>92.4</span></div>';
  const context={URL,Date,atob,document:{title:'TEST stats | HLTV.org',querySelector:()=>null,documentElement:{outerHTML:html}},location:{href:'https://www.hltv.org/stats/players/10/test?event=8038'}};
  vm.createContext(context);vm.runInContext(readFileSync('.checks/extension-package/extractor.js','utf8'),context);
- const result=context.__cs2RadarExtract();assert.equal(result.status,'success');assert.equal(result.data.players[0].stats.event.adr,92.4);
- context.document.readyState='loading';assert.equal(context.__cs2RadarExtract().status,'waiting');
- context.document.readyState='interactive';assert.equal(context.__cs2RadarExtract().status,'success');
- context.document.title='Just a moment...';assert.equal(context.__cs2RadarExtract().status,'waiting');
+ const result=await context.__cs2RadarExtract();assert.equal(result.status,'success');assert.equal(result.data.players[0].stats.event.adr,92.4);
+ context.document.readyState='loading';assert.equal((await context.__cs2RadarExtract()).status,'waiting');
+ context.document.readyState='interactive';assert.equal((await context.__cs2RadarExtract()).status,'success');
+ context.document.title='Just a moment...';assert.equal((await context.__cs2RadarExtract()).status,'waiting');
 });
 test('statistics are returned while the tab is still loading advertising resources',async()=>{
  const h=harness({status:'loading',sleep:()=>{throw Error('Must not wait for tab completion')}});h.connect();

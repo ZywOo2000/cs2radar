@@ -45,7 +45,7 @@ const label=(s:string)=>txt(s).toLowerCase().replace(/[^\w%/−-]/g,'');
 function version(s:string){return s.match(/rating\s*([123]\.\d)/i)?.[1]||'未标注'}
 const metricLabels:Record<string,string>={rating:'rating',adr:'adr','damage/round':'adr',damageperround:'adr',kast:'kast',kpr:'kpr','kills/round':'kpr',killsperround:'kpr',dpr:'dpr','deaths/round':'dpr',deathsperround:'dpr',swing:'swing',roundswing:'swing',mkrating:'multiKill','multi-killrating':'multiKill',multikillrating:'multiKill','totalkills':'kills','totaldeaths':'deaths','k/d':'kd','k/dratio':'kd','k-d':'kdDiff','k−d':'kdDiff','headshot%':'hs','hs%':'hs',maps:'maps',mapsplayed:'maps',rounds:'rounds',roundsplayed:'rounds',firepower:'firepower',entrying:'entrying',trading:'trading',opening:'opening',clutching:'clutching',sniping:'sniping',utility:'utility'};
 function keyFor(s:string){const l=label(s);if(['multi-kill','multikill','multi-kill%','multikill%'].includes(l))return 'multiKillPct';if(['surviving','survivalrate','surviving%'].includes(l))return 'surviving';return /^rating[123]/.test(l)?'rating':metricLabels[l]}
-function derive(s:Stats){if(s.kills!==undefined&&s.deaths!==undefined){s.kdDiff=s.kills-s.deaths;if(s.deaths>0)s.kd=s.kills/s.deaths}if(s.rounds&&s.rounds>0){if(s.kills!==undefined&&s.kpr===undefined)s.kpr=s.kills/s.rounds;if(s.deaths!==undefined&&s.dpr===undefined)s.dpr=s.deaths/s.rounds}return s}
+function derive(s:Stats){if(s.kills!==undefined&&s.deaths!==undefined){s.kdDiff=s.kills-s.deaths;if(s.deaths>0)s.kd=s.kills/s.deaths}if(s.rounds&&s.rounds>0){if(s.kills!==undefined&&s.kpr===undefined)s.kpr=s.kills/s.rounds;if(s.deaths!==undefined&&s.dpr===undefined)s.dpr=s.deaths/s.rounds;if(Number.isInteger(s.multiKillRounds)&&s.multiKillRounds!>=0&&s.multiKillRounds!<=s.rounds&&s.multiKillPct===undefined)s.multiKillPct=s.multiKillRounds!/s.rounds*100}return s}
 function base($:CheerioAPI,u:URL,kind:Dataset['kind']):Dataset{
  const title=txt($('title').first().text()).replace(/\s*\|\s*HLTV\.org.*$/i,'');
  const event=txt($('.timeAndEvent .event a,.event-hub-title,.eventname,.event-name').first().text())||txt($('a[href*="?event="]').filter((_,el)=>!$(el).closest('table').length).first().text());
@@ -57,6 +57,11 @@ export function parseMatch(html:string,u:URL):Dataset{
  const $=load(html),out=base($,u,'match');
  const maps=$('.mapholder').toArray().map(el=>{const m=$(el),scores=m.find('.results-team-score').toArray().map(x=>number($(x).text()));const url=m.find('.results-stats a,a.results-stats,.results-stats').attr('href');return {name:txt(m.find('.mapname').text()),statsId:url?.match(/mapstatsid\/(\d+)/)?.[1],rounds:scores.length===2&&scores.every(x=>x!==undefined)?scores[0]!+scores[1]!:undefined}});
  const mapOnly=u.pathname.includes('/mapstatsid/');
+ // Detailed match pages list map scores in navigation cards, not .mapholder.
+ if(!maps.length)$('a.stats-match-map[href*="/mapstatsid/"]').each((_,el)=>{
+  const node=$(el),score=txt(node.text()).match(/^(\d+)\s*-\s*(\d+)/),statsId=node.attr('href')?.match(/mapstatsid\/(\d+)/)?.[1];
+  if(score&&statsId&&!maps.some(m=>m.statsId===statsId))maps.push({name:'地图 '+statsId,statsId,rounds:Number(score[1])+Number(score[2])});
+ });
  let tables=$('table.totalstats');
  if(!tables.length)tables=$('table.stats-table,table.table').filter((_,el)=>/ADR|KAST|Rating/i.test($(el).find('tr').first().text())&&!/\b(?:ctstats|tstats)\b/.test($(el).attr('class')||''));
  const people=new Map<string,Player>();const scopes=new Map<string,string>();
@@ -64,7 +69,7 @@ export function parseMatch(html:string,u:URL):Dataset{
   const table=$(el);if(/\b(?:ctstats|tstats)\b/.test(table.attr('class')||''))return;
   const ancestor=table.parents('[id]').toArray().map(x=>$(x).attr('id')!).find(x=>/^(?:stats(?:All|\d+)|all-content|(?:map)?\d+-content)$/i.test(x));
   const scope=ancestor&&!/^(?:statsAll|all-content)$/i.test(ancestor)?ancestor:mapOnly?'map':'all';
-  const mapId=scope.match(/\d+/)?.[0];const map=scope.startsWith('map')&&mapId?maps[Number(mapId)-1]:maps.find(m=>m.statsId===mapId);
+  const mapId=scope.match(/\d+/)?.[0];const map=mapOnly?maps.find(m=>m.statsId===u.pathname.match(/mapstatsid\/(\d+)/)?.[1]):scope.startsWith('map')&&mapId?maps[Number(mapId)-1]:maps.find(m=>m.statsId===mapId);
   const scopeName=scope==='all'?'整场比赛':map?.name|| (mapOnly?'单张地图':'地图 '+(mapId||''));
   const rows=table.find('tr');const headers=rows.first().find('th,td').toArray().map(x=>txt($(x).text()));
   const v=version(headers.join(' '));
@@ -75,7 +80,8 @@ export function parseMatch(html:string,u:URL):Dataset{
    const nick=txt(r.find('.player-nick').first().text())||txt(r.find('.playerNickname').first().text())||txt(link.text()).match(/'([^']+)'/)?.[1]||txt(link.text());if(!nick)return;
    const cells=r.children('td'),stats:Stats={};
    cells.each((i,cell)=>{
-    const val=txt($(cell).text());const h=headers[i]||'';const k=keyFor(h);
+    if($(cell).hasClass('eco-adjusted-data'))return;
+    const val=txt($(cell).text());const h=headers[i]||'';const k=label(h)==='mks'?'multiKillRounds':keyFor(h);
     if((label(h)==='k-d'||label(h)==='k−d')&&/^\d+\s*[-−]\s*\d+$/.test(val)){const pair=val.split(/[-−]/).map(Number);stats.kills=pair[0];stats.deaths=pair[1];return}
     if(k){const value=k==='multiKillPct'&&!val.includes('%')?undefined:number(val);if(value!==undefined)stats[k]=value}
    });
@@ -97,6 +103,26 @@ export function parseMatch(html:string,u:URL):Dataset{
  out.notes.push('基础指标使用未经济校正的原始数据。仅读取页面明确提供的统计范围，不自行平均 Rating。');
  if(out.players.every(p=>Object.values(p.stats).every(s=>s.firepower===undefined)))out.notes.push('这份比赛数据未提供官方火力及七项属性；缺失项不估算。');
  return out;
+}
+export function matchDetailSources(html:string,u:URL,data:Dataset):{scope:string;url:string}[]{
+ if(!u.pathname.startsWith('/matches/'))return [];
+ const $=load(html),sources:{scope:string;url:string}[]=[];
+ const whole=$('a[href]').toArray().find(el=>{const href=safeLink($(el).attr('href'),u);return href&&/^\/stats\/matches\/\d+\//.test(new URL(href).pathname)});
+ const add=(scope:string,href:string|undefined)=>{const url=safeLink(href,u);if(url&&data.scopes.some(s=>s.id===scope)&&!sources.some(s=>s.scope===scope))sources.push({scope,url})};
+ add('all',whole?$(whole).attr('href'):undefined);
+ $('.mapholder').each((i,el)=>{const href=$(el).find('a[href*="/mapstatsid/"]').first().attr('href'),id=href?.match(/mapstatsid\/(\d+)/)?.[1];if(!id)return;const scope=data.scopes.find(s=>s.id===`map${i+1}-content`||s.id===`stats${id}`||s.id===`${id}-content`);if(scope)add(scope.id,href)});
+ return sources;
+}
+export function mergeMatchDetails(data:Dataset,html:string,u:URL,scope:string):number{
+ const $=load(html),back=$('a.match-page-link').attr('href');
+ if(!back||safeLink(back,u)!==sourceUrl(data.sourceUrl).href)throw new ImportError('DETAIL_MISMATCH','详细统计不属于当前比赛，未合并。');
+ const detail=parseMatch(html,u);let count=0;
+ for(const p of data.players){const original=p.stats[scope],other=detail.players.find(q=>q.id===p.id),s=other?.stats[u.pathname.includes('/mapstatsid/')?'map':'all'];
+  if(!original||!s||!Number.isInteger(s.multiKillRounds)||!original.rounds||s.rounds!==original.rounds)continue;
+  original.multiKillRounds=s.multiKillRounds;derive(original);if(original.multiKillPct!==undefined)count++;
+ }
+ if(count)data.notes.push('多杀回合占比 = MKs ÷ 当前范围总回合数 × 100；详细统计来源：'+u.href);
+ return count;
 }
 export function parseEvent(html:string,u:URL,title?:string):Dataset{
  const $=load(html),out=base($,u,'event');if(title)out.title=title;out.event=title||out.event||'赛事 '+u.searchParams.get('event');out.scopes=[{id:'event',name:'整届赛事'}];
