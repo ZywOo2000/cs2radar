@@ -35,12 +35,12 @@ test('a newly selected player explicitly starts every ring animation',()=>{
  assert.deepEqual(started,['polygon','axis']);
 });
 
-test('ring motion holds on the inner polygon for 100ms before its 900ms expansion',()=>{
+test('ring motion holds on the inner polygon for 100ms before its 1100ms expansion',()=>{
  assert.equal(RADAR_RING_PAUSE_MS,100);
- assert.equal(RADAR_RING_EXPAND_MS,900);
+ assert.equal(RADAR_RING_EXPAND_MS,1100);
  assert.equal(radarRingProgress(0),0);
  assert.equal(radarRingProgress(99),0);
  assert.equal(radarRingProgress(100),0);
- assert.equal(radarRingProgress(550),.5);
- assert.equal(radarRingProgress(1000),1);
+ assert.equal(radarRingProgress(650),.5);
+ assert.equal(radarRingProgress(1200),1);
 });

@@ -3,7 +3,7 @@ export type RadarMotionKind='rings'|'center';
 export type RadarMotionState={mode:RadarDisplayMode;kind:RadarMotionKind;runId:number};
 
 export const RADAR_RING_PAUSE_MS=100;
-export const RADAR_RING_EXPAND_MS=900;
+export const RADAR_RING_EXPAND_MS=1100;
 
 export const initialRadarMotion:RadarMotionState={mode:'static',kind:'center',runId:0};
 
