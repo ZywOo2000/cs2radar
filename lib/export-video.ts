@@ -68,7 +68,7 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
  };
 
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
- const animationMs=reduced?900:1650,holdMs=1000;
+ const animationMs=reduced?450:motion==='rings'?900:1650,holdMs=1000;
  setProgress(0);
  let frame=videoFrame(clone,graphWidth,graphHeight,title,a,b);
  const canvas=document.createElement('canvas');const targetWidth=1080;
