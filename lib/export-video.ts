@@ -1,4 +1,4 @@
-import {pickRadarMotion,type RadarMotionKind} from './radar-motion';
+import {pickRadarMotion,RADAR_RING_EXPAND_MS,RADAR_RING_PAUSE_MS,radarRingProgress,type RadarMotionKind} from './radar-motion';
 import {interpolatePolygonPoints,supportedVideoMime,videoFileName} from './export-video-utils';
 
 export type ExportSide={name:string;context:string};
@@ -64,11 +64,13 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
    lines.forEach(({node,final})=>['x1','y1','x2','y2'].forEach((attribute,index)=>node.setAttribute(attribute,String(final[index]))));
    circles.forEach(({node,final})=>{node.setAttribute('cx',String(final[0]));node.setAttribute('cy',String(final[1]))})
   }
-  bars.forEach(({node,x,width})=>{const current=width*progress;node.setAttribute('width',String(current));node.setAttribute('x',String(x<500?500-current:500))});
+  bars.forEach(({node,x,width})=>{const current=width*(motion==='rings'?1:progress);node.setAttribute('width',String(current));node.setAttribute('x',String(x<500?500-current:500))});
  };
 
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
- const animationMs=reduced?450:motion==='rings'?900:1650,holdMs=1000;
+ const expansionMs=reduced?450:motion==='rings'?RADAR_RING_EXPAND_MS:1650;
+ const pauseMs=motion==='rings'?RADAR_RING_PAUSE_MS:0;
+ const animationMs=pauseMs+expansionMs,holdMs=1000;
  setProgress(0);
  let frame=videoFrame(clone,graphWidth,graphHeight,title,a,b);
  const canvas=document.createElement('canvas');const targetWidth=1080;
@@ -81,7 +83,7 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
  const recording=new Promise<Blob>((resolve,reject)=>{recorder.ondataavailable=event=>{if(event.data.size)chunks.push(event.data)};recorder.onerror=()=>reject(new Error('录制视频时发生错误，请重试。'));recorder.onstop=()=>chunks.length?resolve(new Blob(chunks,{type:recorder.mimeType||mime})):reject(new Error('浏览器没有生成视频数据，请重试。'))});
  try{
   onProgress(1);recorder.start(100);const start=performance.now();let elapsed=0;
-  while(elapsed<animationMs){elapsed=performance.now()-start;setProgress(elapsed/animationMs);frame=videoFrame(clone,graphWidth,graphHeight,title,a,b);await drawSvg(ctx,frame.svg,canvas.width,canvas.height);onProgress(Math.min(70,Math.round(elapsed/animationMs*70)));await waitFrame()}
+  while(elapsed<animationMs){elapsed=performance.now()-start;setProgress(motion==='rings'?radarRingProgress(elapsed,expansionMs):elapsed/animationMs);frame=videoFrame(clone,graphWidth,graphHeight,title,a,b);await drawSvg(ctx,frame.svg,canvas.width,canvas.height);onProgress(Math.min(70,Math.round(elapsed/animationMs*70)));await waitFrame()}
   setProgress(1);frame=videoFrame(clone,graphWidth,graphHeight,title,a,b);await drawSvg(ctx,frame.svg,canvas.width,canvas.height);
   const holdStart=performance.now();while(performance.now()-holdStart<holdMs){onProgress(70+Math.round((performance.now()-holdStart)/holdMs*25));await waitFrame()}
   recorder.stop();const blob=await recording;onProgress(97);
