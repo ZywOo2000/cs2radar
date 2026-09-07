@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {regularRevealPoints,supportedVideoMime,videoFileName} from '../lib/export-video-utils.ts';
+import {interpolatePolygonPoints,regularRevealPoints,supportedVideoMime,videoFileName} from '../lib/export-video-utils.ts';
 
 test('video export prefers MP4 and falls back to WebM',()=>{
  assert.equal(supportedVideoMime(type=>type==='video/mp4'),'video/mp4');
@@ -19,4 +19,12 @@ test('the reveal mask stays polygonal instead of becoming a circle',()=>{
  const heptagon=regularRevealPoints(7,300,244,100).split(' ');
  assert.equal(hexagon.length,6);assert.equal(heptagon.length,7);
  assert.equal(hexagon[0],'500,265');
+});
+
+test('ring motion starts on the innermost polygon and reaches exact final points',()=>{
+ const inner='0,20 17.32,10 17.32,-10 0,-20 -17.32,-10 -17.32,10';
+ const final='0,100 86.6,50 43.3,-25 0,-70 -69.28,-40 -34.64,20';
+ assert.equal(interpolatePolygonPoints(inner,final,0),inner);
+ assert.equal(interpolatePolygonPoints(inner,final,1),final);
+ assert.equal(interpolatePolygonPoints(inner,final,.5),'0,60 51.96,30 30.31,-17.5 0,-45 -43.3,-25 -25.98,15');
 });

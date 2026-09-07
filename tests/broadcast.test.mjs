@@ -39,17 +39,20 @@ test('missing percentage keeps six labelled axes and does not draw a fake zero p
  const html=renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a,nameA:'TEST'}));const $=load(html);
  assert.deepEqual($('.radar-mode-button').map((_,el)=>$(el).text()).get(),['静态','动态']);
  assert.equal($('.radar-mode-button').first().attr('aria-pressed'),'true');assert.equal($('svg').attr('data-display-mode'),'static');
- assert.equal($('clipPath polygon').length,1);assert.equal($('clipPath circle').length,0);
+ assert.equal($('clipPath').length,0);assert.equal($('animate').length,0);
  assert.equal($('[data-metric-value]').length,6);assert.match($('[data-metric-value="multiKillPct"]').text(),/—/);
  assert.equal($('[data-series="A"] polygon').length,0);assert.equal($('[data-series="A"] line').length,4);assert.equal($('[data-series="A"] circle').length,0);
+ assert.match($('[data-firepower]').text(),/Firepower —/);
  assert.equal($('[data-swing="A"] rect').attr('fill'),'#f06469');assert.doesNotMatch(html,/NaN|Infinity/);
+ assert.doesNotMatch(html,/外圈为参考标准|缺失数据留空/);
 });
 test('complete dual comparison retains values and separate positive/negative swing bars in exported SVG',()=>{
- const a={kpr:1,surviving:50,adr:99,kast:80,multiKillPct:25,rating:1.5,swing:3.5},b={...a,rating:1.2,swing:-.32};
+ const a={kpr:1,surviving:50,adr:99,kast:80,multiKillPct:25,rating:1.5,swing:3.5,firepower:91},b={...a,rating:1.2,swing:-.32,firepower:84};
  const $=load(renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a,b,nameA:'A',nameB:'B'})));
  assert.equal($('[data-series="A"] polygon').length,1);assert.equal($('[data-series="B"] polygon').length,1);
  assert.equal($('[data-series="A"] circle, [data-series="B"] circle').length,0);
  assert.match($('[data-metric-value="rating"]').text(),/1.50.*1.30.*1.20/);
+ assert.match($('[data-firepower]').text(),/A 91.*B 84/);
  assert.equal($('[data-swing="A"] rect').attr('fill'),'#22d559');assert.equal($('[data-swing="B"] rect').attr('fill'),'#f06469');
 });
 test('reference grid stays the same size when a player exceeds the outer scale',()=>{

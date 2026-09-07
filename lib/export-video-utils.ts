@@ -13,3 +13,10 @@ export const regularRevealPoints=(axisCount:number,cx:number,cy:number,radius:nu
  const angle=-Math.PI/2+i*Math.PI*2/Math.max(3,axisCount);
  return `${cx+Math.cos(angle)*radius},${cy+Math.sin(angle)*radius}`;
 }).join(' ');
+
+export const interpolatePolygonPoints=(from:string,to:string,progress:number)=>{
+ const parse=(points:string)=>points.trim().split(/\s+/).map(pair=>pair.split(',').map(Number));
+ const start=parse(from),end=parse(to),amount=Math.max(0,Math.min(1,progress));
+ if(start.length!==end.length||start.some(point=>point.length!==2||point.some(value=>!Number.isFinite(value)))||end.some(point=>point.length!==2||point.some(value=>!Number.isFinite(value))))return to;
+ return end.map((point,index)=>`${start[index][0]+(point[0]-start[index][0])*amount},${start[index][1]+(point[1]-start[index][1])*amount}`).join(' ');
+};

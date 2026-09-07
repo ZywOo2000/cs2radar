@@ -1,5 +1,5 @@
 import {pickRadarMotion,type RadarMotionKind} from './radar-motion';
-import {regularRevealPoints,supportedVideoMime,videoFileName} from './export-video-utils';
+import {interpolatePolygonPoints,supportedVideoMime,videoFileName} from './export-video-utils';
 
 export type ExportSide={name:string;context:string};
 export type VideoExportResult={format:'MP4'|'WebM';fileName:string;motion:RadarMotionKind};
@@ -31,6 +31,7 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
  if(!mime)throw new Error('当前浏览器没有可用的视频编码器，请使用最新版 Chrome 或 Edge。');
 
  const clone=live.cloneNode(true) as SVGSVGElement;
+ clone.querySelectorAll<SVGAnimateElement>('animate').forEach(animation=>{const attribute=animation.getAttribute('attributeName'),target=animation.getAttribute('to');if(attribute&&target)animation.parentElement?.setAttribute(attribute,target);animation.remove()});
  clone.querySelectorAll('.radar-motion-center,.radar-motion-rings,.radar-motion-bar').forEach(node=>node.classList.remove('radar-motion-center','radar-motion-rings','radar-motion-bar'));
  clone.removeAttribute('class');clone.removeAttribute('data-display-mode');clone.removeAttribute('data-motion-kind');clone.removeAttribute('data-motion-run');
  const box=(clone.getAttribute('viewBox')||'0 0 600 500').split(/\s+/).map(Number);
@@ -40,10 +41,10 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
  const series=[...clone.querySelectorAll<SVGGElement>('[data-series="A"],[data-series="B"]')];
  if(!series.length)throw new Error('当前数据图没有可导出的数据区域。');
  const original=series.map(node=>({node,transform:node.getAttribute('transform'),clip:node.getAttribute('clip-path')}));
- const defs=clone.querySelector('defs')||clone.insertBefore(document.createElementNS(NS,'defs'),clone.firstChild);
- const clip=document.createElementNS(NS,'clipPath');clip.id='video-export-reveal';clip.setAttribute('clipPathUnits','userSpaceOnUse');
- const reveal=document.createElementNS(NS,'polygon');clip.appendChild(reveal);defs.appendChild(clip);
- const axisCount=Math.max(3,clone.querySelectorAll('[data-metric-value]').length);const revealRadius=Math.hypot(graphWidth,graphHeight)*1.15;
+ const innerPoints=clone.querySelector<SVGPolygonElement>('[data-reference-ring="20"]')?.getAttribute('points')||'';
+ const polygons=series.flatMap(node=>[...node.querySelectorAll<SVGPolygonElement>('polygon')]).map(node=>({node,final:node.getAttribute('data-final-points')||node.getAttribute('points')||''}));
+ const lines=series.flatMap(node=>[...node.querySelectorAll<SVGLineElement>('line')]).map(node=>({node,axisFrom:Number(node.getAttribute('data-axis-from')),axisTo:Number(node.getAttribute('data-axis-to')),final:[Number(node.getAttribute('data-final-x1')||node.getAttribute('x1')),Number(node.getAttribute('data-final-y1')||node.getAttribute('y1')),Number(node.getAttribute('data-final-x2')||node.getAttribute('x2')),Number(node.getAttribute('data-final-y2')||node.getAttribute('y2'))]}));
+ const inner=innerPoints.trim().split(/\s+/).map(pair=>pair.split(',').map(Number));
  const bars=[...clone.querySelectorAll<SVGRectElement>('[data-swing] rect')].map(node=>({node,x:Number(node.getAttribute('x')||500),width:Number(node.getAttribute('width')||0)}));
  const motion=pickRadarMotion();
  const setProgress=(raw:number)=>{
@@ -51,9 +52,15 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
   original.forEach(({node,transform,clip:oldClip})=>{
    if(raw>=1){if(transform===null)node.removeAttribute('transform');else node.setAttribute('transform',transform);if(oldClip===null)node.removeAttribute('clip-path');else node.setAttribute('clip-path',oldClip);return}
    if(motion==='center'){node.setAttribute('transform',`translate(${center.x} ${center.y}) scale(${Math.max(.002,progress)}) translate(${-center.x} ${-center.y})`);node.removeAttribute('clip-path')}
-   else{if(transform===null)node.removeAttribute('transform');else node.setAttribute('transform',transform);node.setAttribute('clip-path','url(#video-export-reveal)')}
+   else{if(transform===null)node.removeAttribute('transform');else node.setAttribute('transform',transform);node.removeAttribute('clip-path')}
   });
-  reveal.setAttribute('points',regularRevealPoints(axisCount,center.x,center.y,motion==='rings'?revealRadius*progress:0));
+  if(motion==='rings'){
+   polygons.forEach(({node,final})=>node.setAttribute('points',interpolatePolygonPoints(innerPoints,final,progress)));
+   lines.forEach(({node,axisFrom,axisTo,final})=>{const start=inner[axisFrom],end=inner[axisTo];if(!start||!end)return;const values=[start[0]+(final[0]-start[0])*progress,start[1]+(final[1]-start[1])*progress,end[0]+(final[2]-end[0])*progress,end[1]+(final[3]-end[1])*progress];['x1','y1','x2','y2'].forEach((attribute,index)=>node.setAttribute(attribute,String(values[index])))})
+  }else{
+   polygons.forEach(({node,final})=>node.setAttribute('points',final));
+   lines.forEach(({node,final})=>['x1','y1','x2','y2'].forEach((attribute,index)=>node.setAttribute(attribute,String(final[index]))));
+  }
   bars.forEach(({node,x,width})=>{const current=width*progress;node.setAttribute('width',String(current));node.setAttribute('x',String(x<500?500-current:500))});
  };
 
