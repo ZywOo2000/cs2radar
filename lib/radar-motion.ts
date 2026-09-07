@@ -11,3 +11,9 @@ export const replayRadarMotion=(state:RadarMotionState,kind:RadarMotionKind):Rad
 export const refreshDynamicRadar=(state:RadarMotionState,kind:RadarMotionKind):RadarMotionState=>state.mode==='dynamic'?replayRadarMotion(state,kind):state;
 
 export const stopRadarMotion=(state:RadarMotionState):RadarMotionState=>({...state,mode:'static'});
+
+export const beginRadarRingAnimations=(animations:Iterable<{beginElement:()=>void}>)=>{
+ let count=0;
+ for(const animation of animations){animation.beginElement();count++}
+ return count;
+};

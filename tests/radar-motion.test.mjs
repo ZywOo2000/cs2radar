@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {initialRadarMotion,pickRadarMotion,refreshDynamicRadar,replayRadarMotion,stopRadarMotion} from '../lib/radar-motion.ts';
+import {beginRadarRingAnimations,initialRadarMotion,pickRadarMotion,refreshDynamicRadar,replayRadarMotion,stopRadarMotion} from '../lib/radar-motion.ts';
 
 test('each animation choice uses an independent exact 50 percent boundary',()=>{
  assert.equal(pickRadarMotion(()=>0),'rings');
@@ -23,4 +23,14 @@ test('changed player data replays only while dynamic mode is selected',()=>{
  const dynamic=replayRadarMotion(initialRadarMotion,'center');
  assert.deepEqual(refreshDynamicRadar(dynamic,'rings'),{mode:'dynamic',kind:'rings',runId:2});
  assert.equal(refreshDynamicRadar(initialRadarMotion,'rings'),initialRadarMotion);
+});
+
+test('a newly selected player explicitly starts every ring animation',()=>{
+ const started=[];
+ const count=beginRadarRingAnimations([
+  {beginElement:()=>started.push('polygon')},
+  {beginElement:()=>started.push('axis')},
+ ]);
+ assert.equal(count,2);
+ assert.deepEqual(started,['polygon','axis']);
 });

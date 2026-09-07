@@ -1,6 +1,16 @@
 'use client';
 import {useCallback,useEffect,useId,useRef,useState} from 'react';
-import {initialRadarMotion,pickRadarMotion,refreshDynamicRadar,replayRadarMotion,stopRadarMotion} from '@/lib/radar-motion';
+import {beginRadarRingAnimations,initialRadarMotion,pickRadarMotion,refreshDynamicRadar,replayRadarMotion,stopRadarMotion,type RadarMotionKind} from '@/lib/radar-motion';
+
+export function useRadarRingPlayback(mode:'static'|'dynamic',kind:RadarMotionKind,runId:number){
+ const svgRef=useRef<SVGSVGElement>(null);
+ useEffect(()=>{
+  if(mode!=='dynamic'||kind!=='rings')return;
+  const frame=requestAnimationFrame(()=>beginRadarRingAnimations(svgRef.current?.querySelectorAll<SVGAnimationElement>('animate[data-radar-ring-motion]')||[]));
+  return()=>cancelAnimationFrame(frame);
+ },[mode,kind,runId]);
+ return svgRef;
+}
 
 export function useRadarMotion(dataKey=''){
  const [state,setState]=useState(initialRadarMotion);
