@@ -44,6 +44,7 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
  const innerPoints=clone.querySelector<SVGPolygonElement>('[data-reference-ring="20"]')?.getAttribute('points')||'';
  const polygons=series.flatMap(node=>[...node.querySelectorAll<SVGPolygonElement>('polygon')]).map(node=>({node,final:node.getAttribute('data-final-points')||node.getAttribute('points')||''}));
  const lines=series.flatMap(node=>[...node.querySelectorAll<SVGLineElement>('line')]).map(node=>({node,axisFrom:Number(node.getAttribute('data-axis-from')),axisTo:Number(node.getAttribute('data-axis-to')),final:[Number(node.getAttribute('data-final-x1')||node.getAttribute('x1')),Number(node.getAttribute('data-final-y1')||node.getAttribute('y1')),Number(node.getAttribute('data-final-x2')||node.getAttribute('x2')),Number(node.getAttribute('data-final-y2')||node.getAttribute('y2'))]}));
+ const circles=series.flatMap(node=>[...node.querySelectorAll<SVGCircleElement>('circle')]).map(node=>({node,axis:Number(node.getAttribute('data-axis')),final:[Number(node.getAttribute('data-final-cx')||node.getAttribute('cx')),Number(node.getAttribute('data-final-cy')||node.getAttribute('cy'))]}));
  const inner=innerPoints.trim().split(/\s+/).map(pair=>pair.split(',').map(Number));
  const bars=[...clone.querySelectorAll<SVGRectElement>('[data-swing] rect')].map(node=>({node,x:Number(node.getAttribute('x')||500),width:Number(node.getAttribute('width')||0)}));
  const motion=pickRadarMotion();
@@ -57,9 +58,11 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
   if(motion==='rings'){
    polygons.forEach(({node,final})=>node.setAttribute('points',interpolatePolygonPoints(innerPoints,final,progress)));
    lines.forEach(({node,axisFrom,axisTo,final})=>{const start=inner[axisFrom],end=inner[axisTo];if(!start||!end)return;const values=[start[0]+(final[0]-start[0])*progress,start[1]+(final[1]-start[1])*progress,end[0]+(final[2]-end[0])*progress,end[1]+(final[3]-end[1])*progress];['x1','y1','x2','y2'].forEach((attribute,index)=>node.setAttribute(attribute,String(values[index])))})
+   circles.forEach(({node,axis,final})=>{const start=inner[axis];if(!start)return;node.setAttribute('cx',String(start[0]+(final[0]-start[0])*progress));node.setAttribute('cy',String(start[1]+(final[1]-start[1])*progress))})
   }else{
    polygons.forEach(({node,final})=>node.setAttribute('points',final));
    lines.forEach(({node,final})=>['x1','y1','x2','y2'].forEach((attribute,index)=>node.setAttribute(attribute,String(final[index]))));
+   circles.forEach(({node,final})=>{node.setAttribute('cx',String(final[0]));node.setAttribute('cy',String(final[1]))})
   }
   bars.forEach(({node,x,width})=>{const current=width*progress;node.setAttribute('width',String(current));node.setAttribute('x',String(x<500?500-current:500))});
  };
