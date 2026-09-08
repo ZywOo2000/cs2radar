@@ -1,5 +1,6 @@
 import {pickRadarMotion,RADAR_RING_EXPAND_MS,RADAR_RING_PAUSE_MS,radarRingProgress,type RadarMotionKind} from './radar-motion';
 import {interpolatePolygonPoints,supportedVideoMime,videoFileName} from './export-video-utils';
+import {applyRadarViewBox} from './radar-bounds';
 
 export type ExportSide={name:string;context:string};
 export type VideoExportResult={format:'MP4'|'WebM';fileName:string;motion:RadarMotionKind};
@@ -34,10 +35,8 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
  clone.querySelectorAll<SVGAnimateElement>('animate').forEach(animation=>{const attribute=animation.getAttribute('attributeName'),target=animation.getAttribute('to');if(attribute&&target)animation.parentElement?.setAttribute(attribute,target);animation.remove()});
  clone.querySelectorAll('.radar-motion-center,.radar-motion-rings,.radar-motion-bar').forEach(node=>node.classList.remove('radar-motion-center','radar-motion-rings','radar-motion-bar'));
  clone.removeAttribute('class');clone.removeAttribute('data-display-mode');clone.removeAttribute('data-motion-kind');clone.removeAttribute('data-motion-run');
- const box=(clone.getAttribute('viewBox')||'0 0 600 500').split(/\s+/).map(Number);
- const graphWidth=box[2]||600,graphHeight=box[3]||500;
- clone.setAttribute('width',String(graphWidth));clone.setAttribute('height',String(graphHeight));
- const center=graphWidth>800?{x:500,y:365}:{x:300,y:244};
+ const center={x:Number(clone.getAttribute('data-radar-center-x')||300),y:Number(clone.getAttribute('data-radar-center-y')||244)};
+ const bounds=applyRadarViewBox(clone);const graphWidth=bounds.width,graphHeight=bounds.height;
  const series=[...clone.querySelectorAll<SVGGElement>('[data-series="A"],[data-series="B"]')];
  if(!series.length)throw new Error('当前数据图没有可导出的数据区域。');
  const original=series.map(node=>({node,transform:node.getAttribute('transform'),clip:node.getAttribute('clip-path')}));

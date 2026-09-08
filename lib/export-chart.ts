@@ -1,9 +1,10 @@
 import {type Metric,type Stats,format} from './stats';
+import {applyRadarViewBox} from './radar-bounds';
 type Side={name:string;context:string;source:string;version:string;stats:Stats;demo:boolean};
 const escape=(s:string)=>s.replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]!));
 export async function exportChart(title:string,metrics:Metric[],a:Side,b?:Side){
  const graph=document.getElementById('performance-radar');if(!graph)throw new Error('雷达图尚未就绪。');
- const box=(graph.getAttribute('viewBox')||'0 0 600 500').split(/\s+/).map(Number);const width=box[2],height=box[3],scale=Math.min(1.26,1080/width),rawStart=205+height*scale+45,notes=rawStart+Math.ceil(metrics.length/4)*72+15,totalHeight=Math.ceil(notes+200);const clone=graph.cloneNode(true) as Element;clone.setAttribute('width',String(width));clone.setAttribute('height',String(height));clone.removeAttribute('class');const xml=new XMLSerializer().serializeToString(clone);
+ const clone=graph.cloneNode(true) as Element;const bounds=applyRadarViewBox(clone);const width=bounds.width,height=bounds.height,scale=Math.min(1.26,1080/width),rawStart=205+height*scale+45,notes=rawStart+Math.ceil(metrics.length/4)*72+15,totalHeight=Math.ceil(notes+200);clone.removeAttribute('class');const xml=new XMLSerializer().serializeToString(clone);
  const text=(x:number,y:number,s:string,size=18,color='#a9b9c9')=>'<text x="'+x+'" y="'+y+'" fill="'+color+'" font-family="Arial, Microsoft YaHei, sans-serif" font-size="'+size+'">'+escape(s)+'</text>';
  const raw=metrics.map((m,i)=>{const x=50+(i%4)*286,y=rawStart+Math.floor(i/4)*72;return text(x,y,m.label+' · '+m.name,14)+text(x,y+29,'A '+format(a.stats[m.key],m),20,'#bddbff')+(b?text(x+132,y+29,'B '+format(b.stats[m.key],m),20,'#61dac8'):'')}).join('');
  const metaA='A '+a.name+' · '+a.context+' · Rating '+a.version;
