@@ -2,7 +2,21 @@ export type RadarViewBox={x:number;y:number;width:number;height:number};
 
 const numbers=(value:string|null)=>value?.trim().split(/[\s,]+/).map(Number).filter(Number.isFinite)||[];
 
-export function radarViewBox(svg:Element,padding=18):RadarViewBox{
+export function radarEffectPadding(svg:Element){
+ let stroke=0,radius=0,blur=0,shadow=0;
+ svg.querySelectorAll('[data-series="A"] *,[data-series="B"] *').forEach(node=>{
+  stroke=Math.max(stroke,Number(node.getAttribute('stroke-width')||0)/2);
+  radius=Math.max(radius,Number(node.getAttribute('r')||0));
+ });
+ svg.querySelectorAll('feGaussianBlur').forEach(node=>{blur=Math.max(blur,...numbers(node.getAttribute('stdDeviation')))});
+ svg.querySelectorAll('feDropShadow').forEach(node=>{
+  const spread=Math.max(Math.abs(Number(node.getAttribute('dx')||0)),Math.abs(Number(node.getAttribute('dy')||0)))+3*Math.max(0,...numbers(node.getAttribute('stdDeviation')));
+  shadow=Math.max(shadow,spread);
+ });
+ return Math.ceil(stroke+radius+Math.max(blur*3,shadow)+2);
+}
+
+export function radarViewBox(svg:Element,padding=radarEffectPadding(svg)):RadarViewBox{
  const original=numbers(svg.getAttribute('viewBox'));
  const base:RadarViewBox=original.length>=4?{x:original[0],y:original[1],width:original[2],height:original[3]}:{x:0,y:0,width:600,height:500};
  let minX=base.x,minY=base.y,maxX=base.x+base.width,maxY=base.y+base.height;
@@ -23,11 +37,13 @@ export function radarViewBox(svg:Element,padding=18):RadarViewBox{
  return {x:minX,y:minY,width:maxX-minX,height:maxY-minY};
 }
 
-export function applyRadarViewBox(svg:Element,padding=18){
+export function applyRadarViewBox(svg:Element,padding=radarEffectPadding(svg)){
  const box=radarViewBox(svg,padding);
  svg.setAttribute('viewBox',`${box.x} ${box.y} ${box.width} ${box.height}`);
  svg.setAttribute('width',String(box.width));
  svg.setAttribute('height',String(box.height));
  svg.setAttribute('overflow','visible');
+ const background=Array.from(svg.children).find(node=>node.tagName.toLowerCase()==='rect');
+ if(background){background.setAttribute('x',String(box.x));background.setAttribute('y',String(box.y));background.setAttribute('width',String(box.width));background.setAttribute('height',String(box.height));background.setAttribute('rx','0')}
  return box;
 }

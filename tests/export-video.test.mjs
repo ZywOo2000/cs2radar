@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {interpolatePolygonPoints,regularRevealPoints,supportedVideoMime,videoFileName} from '../lib/export-video-utils.ts';
+import {interpolatePolygonPoints,regularRevealPoints,supportedVideoMime,videoCanvasSize,videoFileName,videoFrameGeometry} from '../lib/export-video-utils.ts';
 
 test('video export prefers MP4 and falls back to WebM',()=>{
  assert.equal(supportedVideoMime(type=>type==='video/mp4'),'video/mp4');
@@ -27,4 +27,14 @@ test('ring motion starts on the innermost polygon and reaches exact final points
  assert.equal(interpolatePolygonPoints(inner,final,0),inner);
  assert.equal(interpolatePolygonPoints(inner,final,1),final);
  assert.equal(interpolatePolygonPoints(inner,final,.5),'0,60 51.96,30 30.31,-17.5 0,-45 -43.3,-25 -25.98,15');
+});
+
+test('video frame and canvas expand without shrinking the chart scale',()=>{
+ const ordinary=videoFrameGeometry(1000,960);
+ const overflow=videoFrameGeometry(1400,1200);
+ assert.equal(ordinary.width,1200);assert.equal(ordinary.scale,1.1);
+ assert.equal(overflow.width,1640);assert.equal(overflow.scale,1.1);
+ assert.ok(Math.abs(overflow.graphX-50)<1e-9);
+ assert.deepEqual(videoCanvasSize(1200,1280),{width:1080,height:1152});
+ assert.deepEqual(videoCanvasSize(1640,1525),{width:1476,height:1374});
 });

@@ -1,5 +1,5 @@
 import {pickRadarMotion,RADAR_RING_EXPAND_MS,RADAR_RING_PAUSE_MS,radarRingProgress,type RadarMotionKind} from './radar-motion';
-import {interpolatePolygonPoints,supportedVideoMime,videoFileName} from './export-video-utils';
+import {interpolatePolygonPoints,supportedVideoMime,videoCanvasSize,videoFileName,videoFrameGeometry} from './export-video-utils';
 import {applyRadarViewBox} from './radar-bounds';
 
 export type ExportSide={name:string;context:string};
@@ -17,7 +17,7 @@ async function drawSvg(ctx:CanvasRenderingContext2D,svg:string,width:number,heig
 }
 
 function videoFrame(clone:SVGSVGElement,graphWidth:number,graphHeight:number,title:string,a:ExportSide,b?:ExportSide){
- const outerWidth=1200,header=170,scale=Math.min(1.1,1100/graphWidth),graphX=(outerWidth-graphWidth*scale)/2,totalHeight=Math.ceil(header+graphHeight*scale+35);
+ const {width:outerWidth,height:totalHeight,header,scale,graphX}=videoFrameGeometry(graphWidth,graphHeight);
  const xml=new XMLSerializer().serializeToString(clone);
  const text=(x:number,y:number,value:string,size:number,color:string,weight=400)=>`<text x="${x}" y="${y}" fill="${color}" font-family="Arial, Microsoft YaHei, sans-serif" font-size="${size}" font-weight="${weight}">${escape(value)}</text>`;
  const legendB=b?text(600,133,`B · ${b.name} · ${b.context}`.slice(0,82),17,'#61dac8',600):'';
@@ -72,8 +72,8 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
  const animationMs=pauseMs+expansionMs,holdMs=1000;
  setProgress(0);
  let frame=videoFrame(clone,graphWidth,graphHeight,title,a,b);
- const canvas=document.createElement('canvas');const targetWidth=1080;
- canvas.width=targetWidth;canvas.height=Math.round(targetWidth*frame.height/frame.width);
+ const canvas=document.createElement('canvas');const canvasSize=videoCanvasSize(frame.width,frame.height);
+ canvas.width=canvasSize.width;canvas.height=canvasSize.height;
  const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('浏览器无法创建视频画布。');
  await drawSvg(ctx,frame.svg,canvas.width,canvas.height);
  const stream=canvas.captureStream(30);const chunks:Blob[]=[];
