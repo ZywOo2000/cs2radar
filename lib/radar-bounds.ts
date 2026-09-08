@@ -4,7 +4,7 @@ const numbers=(value:string|null)=>value?.trim().split(/[\s,]+/).map(Number).fil
 
 export function radarEffectPadding(svg:Element){
  let stroke=0,radius=0,blur=0,shadow=0;
- svg.querySelectorAll('[data-series="A"] *,[data-series="B"] *').forEach(node=>{
+ svg.querySelectorAll('[data-series="A"] *,[data-series="B"] *,[data-swing] rect').forEach(node=>{
   stroke=Math.max(stroke,Number(node.getAttribute('stroke-width')||0)/2);
   radius=Math.max(radius,Number(node.getAttribute('r')||0));
  });
@@ -32,6 +32,10 @@ export function radarViewBox(svg:Element,padding=radarEffectPadding(svg)):RadarV
    include(Number(node.getAttribute('data-final-x2')||node.getAttribute('x2')),Number(node.getAttribute('data-final-y2')||node.getAttribute('y2')));
   });
   series.querySelectorAll('circle').forEach(node=>include(Number(node.getAttribute('data-final-cx')||node.getAttribute('cx')),Number(node.getAttribute('data-final-cy')||node.getAttribute('cy'))));
+ });
+ svg.querySelectorAll('[data-swing] rect').forEach(node=>{
+  const x=Number(node.getAttribute('x')),y=Number(node.getAttribute('y')),width=Number(node.getAttribute('width')),height=Number(node.getAttribute('height'));
+  include(x,y);include(x+width,y+height);
  });
 
  return {x:minX,y:minY,width:maxX-minX,height:maxY-minY};

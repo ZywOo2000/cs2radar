@@ -63,7 +63,7 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
    lines.forEach(({node,final})=>['x1','y1','x2','y2'].forEach((attribute,index)=>node.setAttribute(attribute,String(final[index]))));
    circles.forEach(({node,final})=>{node.setAttribute('cx',String(final[0]));node.setAttribute('cy',String(final[1]))})
   }
-  bars.forEach(({node,x,width})=>{const current=width*(motion==='rings'?1:progress);node.setAttribute('width',String(current));node.setAttribute('x',String(x<500?500-current:500))});
+  bars.forEach(({node,x,width})=>{const current=width*progress;node.setAttribute('width',String(current));node.setAttribute('x',String(x<500?500-current:500))});
  };
 
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;

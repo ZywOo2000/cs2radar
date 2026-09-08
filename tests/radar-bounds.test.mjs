@@ -29,6 +29,12 @@ test('effect padding includes stroke, point radius and three blur deviations',()
 
 test('ordinary values retain the original export area',()=>{
  const ordinary={querySelectorAll(selector){return selector==='polygon'?[element({'data-final-points':'200,200 800,700'})]:[]}};
- const svg={getAttribute:()=> '0 0 1000 960',querySelectorAll:()=>[ordinary]};
+ const svg={getAttribute:()=> '0 0 1000 960',querySelectorAll:selector=>selector==='[data-series="A"],[data-series="B"]'?[ordinary]:[]};
  assert.deepEqual(radarViewBox(svg,20),{x:0,y:0,width:1000,height:960});
+});
+
+test('export bounds include positive and negative swing overflow',()=>{
+ const left=element({x:'-300',y:'780',width:'400',height:'20'}),right=element({x:'500',y:'840',width:'800',height:'20'});
+ const svg={getAttribute:name=>name==='viewBox'?'0 0 1000 960':null,querySelectorAll(selector){if(selector==='[data-swing] rect')return [left,right];if(selector.includes('[data-swing] rect'))return [left,right];return []}};
+ assert.deepEqual(radarViewBox(svg),{x:-302,y:0,width:1604,height:960});
 });
