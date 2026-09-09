@@ -51,7 +51,8 @@ test('complete dual comparison retains values and separate positive/negative swi
  const $=load(renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a,b,nameA:'A',nameB:'B'})));
  assert.equal($('[data-series="A"] polygon').length,1);assert.equal($('[data-series="B"] polygon').length,1);
  assert.equal($('[data-series="A"] circle, [data-series="B"] circle').length,0);
- assert.match($('[data-metric-value="rating"]').text(),/1.50.*1.30.*1.20/);
+ assert.match($('[data-metric-value="rating"]').text(),/1.50.*1.20/);
+ assert.doesNotMatch($('[data-metric-value="rating"]').text(),/圆心|外圈/);
  assert.match($('[data-firepower]').text(),/A 91.*B 84/);
  assert.equal($('[data-firepower] text').last().text(),'火力值');
  assert.equal($('[data-firepower] text').first().attr('y'),'738');
