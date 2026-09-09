@@ -78,3 +78,14 @@ test('round swing uses a fixed scale and overflows equally to the left and right
  assert.match($('[data-swing="A"]').text(),/\+7\.00%/);
  assert.match($('[data-swing="B"]').text(),/-7\.00%/);
 });
+test('custom Best markers enlarge the selected values and inherit each radar series color',()=>{
+ const base={kpr:.85,surviving:43,adr:85,kast:78,multiKillPct:20,rating:1.3,swing:3.5,firepower:80};
+ const $=load(renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a:base,b:base,nameA:'A',nameB:'B',bestA:['kpr','firepower'],bestB:['adr','swing'],colorA:'#6aaeff',colorB:'#54ddc2'})));
+ assert.equal($('[data-metric-value="kpr"] [data-best-label="A"]').text(),'Best');
+ assert.equal($('[data-metric-value="kpr"] [data-best-value]').attr('font-size'),'42');
+ assert.equal($('[data-metric-value="kpr"] [data-best-label="A"]').attr('fill'),'#6aaeff');
+ assert.equal($('[data-metric-value="adr"] [data-best-label="B"]').attr('fill'),'#54ddc2');
+ assert.equal($('[data-firepower] [data-best-label="A"]').attr('fill'),'#6aaeff');
+ assert.equal($('[data-swing="B"] [data-best-label="B"]').attr('fill'),'#54ddc2');
+ assert.equal($('[data-metric-value="rating"] [data-best-label]').length,0);
+});
