@@ -85,12 +85,16 @@ test('custom Best markers enlarge the selected values and inherit each radar ser
  assert.equal($('[data-metric-value="kpr"] [data-best-label="A"]').text(),'Best');
  assert.equal($('[data-metric-value="kpr"] [data-best-value]').attr('font-size'),'42');
  assert.equal($('[data-metric-value="kpr"] [data-best-label="A"]').attr('fill'),'#6aaeff');
+ assert.equal($('[data-metric-value="kpr"] [data-best-value]').attr('filter'),'url(#broadcast-best-a-value)');
  assert.equal($('[data-metric-value="kpr"] [data-best-label="A"]').attr('filter'),'url(#broadcast-best-a-glow)');
  assert.equal($('[data-metric-value="kpr"] [data-best-value]').attr('data-best-motion'),'true');
  assert.equal($('[data-metric-value="kpr"] [data-best-label="A"]').attr('data-best-motion'),'true');
  assert.equal($('#broadcast-best-a-glow feFlood').attr('flood-color'),'#6aaeff');
+ assert.equal($('#broadcast-best-a-value feFlood').first().attr('flood-color'),'#6aaeff');
+ assert.equal($('#broadcast-best-a-value feSpecularLighting').attr('lighting-color'),'#ffffff');
  assert.equal($('[data-metric-value="adr"] [data-best-label="B"]').attr('fill'),'#54ddc2');
  assert.equal($('#broadcast-best-b-glow feFlood').attr('flood-color'),'#54ddc2');
+ assert.equal($('#broadcast-best-b-value feFlood').first().attr('flood-color'),'#54ddc2');
  assert.equal($('[data-firepower] [data-best-label="A"]').attr('fill'),'#6aaeff');
  assert.equal($('[data-swing="B"] [data-best-label="B"]').attr('fill'),'#54ddc2');
  assert.equal($('[data-metric-value="rating"] [data-best-label]').length,0);
