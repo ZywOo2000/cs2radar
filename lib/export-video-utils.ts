@@ -21,6 +21,8 @@ export const interpolatePolygonPoints=(from:string,to:string,progress:number)=>{
  return end.map((point,index)=>`${start[index][0]+(point[0]-start[index][0])*amount},${start[index][1]+(point[1]-start[index][1])*amount}`).join(' ');
 };
 
+export const bestRevealOpacity=(progress:number)=>.06+.94*Math.max(0,Math.min(1,progress));
+
 export const videoFrameGeometry=(graphWidth:number,graphHeight:number)=>{
  const scale=1.1,header=170,outerWidth=Math.ceil(Math.max(1200,graphWidth*scale+100)-1e-8),height=Math.ceil(header+graphHeight*scale+35-1e-8);
  return {width:outerWidth,height,scale,header,graphX:(outerWidth-graphWidth*scale)/2};

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {interpolatePolygonPoints,regularRevealPoints,supportedVideoMime,videoCanvasSize,videoFileName,videoFrameGeometry} from '../lib/export-video-utils.ts';
+import {bestRevealOpacity,interpolatePolygonPoints,regularRevealPoints,supportedVideoMime,videoCanvasSize,videoFileName,videoFrameGeometry} from '../lib/export-video-utils.ts';
 
 test('video export prefers MP4 and falls back to WebM',()=>{
  assert.equal(supportedVideoMime(type=>type==='video/mp4'),'video/mp4');
@@ -37,4 +37,11 @@ test('video frame and canvas expand without shrinking the chart scale',()=>{
  assert.ok(Math.abs(overflow.graphX-50)<1e-9);
  assert.deepEqual(videoCanvasSize(1200,1280),{width:1080,height:1152});
  assert.deepEqual(videoCanvasSize(1640,1525),{width:1476,height:1374});
+});
+
+test('Best values fade from the initial dynamic frame to full visibility',()=>{
+ assert.equal(bestRevealOpacity(0),.06);
+ assert.equal(bestRevealOpacity(1),1);
+ assert.equal(bestRevealOpacity(-1),.06);
+ assert.equal(bestRevealOpacity(2),1);
 });

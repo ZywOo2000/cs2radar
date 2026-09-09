@@ -1,5 +1,5 @@
 import {pickRadarMotion,RADAR_RING_EXPAND_MS,RADAR_RING_PAUSE_MS,radarRingProgress,type RadarMotionKind} from './radar-motion';
-import {interpolatePolygonPoints,supportedVideoMime,videoCanvasSize,videoFileName,videoFrameGeometry} from './export-video-utils';
+import {bestRevealOpacity,interpolatePolygonPoints,supportedVideoMime,videoCanvasSize,videoFileName,videoFrameGeometry} from './export-video-utils';
 import {applyRadarViewBox} from './radar-bounds';
 
 export type ExportSide={name:string;context:string};
@@ -33,7 +33,7 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
 
  const clone=live.cloneNode(true) as SVGSVGElement;
  clone.querySelectorAll<SVGAnimateElement>('animate').forEach(animation=>{const attribute=animation.getAttribute('attributeName'),target=animation.getAttribute('to');if(attribute&&target)animation.parentElement?.setAttribute(attribute,target);animation.remove()});
- clone.querySelectorAll('.radar-motion-center,.radar-motion-rings,.radar-motion-bar').forEach(node=>node.classList.remove('radar-motion-center','radar-motion-rings','radar-motion-bar'));
+ clone.querySelectorAll('.radar-motion-center,.radar-motion-rings,.radar-motion-bar,.radar-best-motion').forEach(node=>node.classList.remove('radar-motion-center','radar-motion-rings','radar-motion-bar','radar-best-motion','radar-best-center','radar-best-rings'));
  clone.removeAttribute('class');clone.removeAttribute('data-display-mode');clone.removeAttribute('data-motion-kind');clone.removeAttribute('data-motion-run');
  const center={x:Number(clone.getAttribute('data-radar-center-x')||300),y:Number(clone.getAttribute('data-radar-center-y')||244)};
  const bounds=applyRadarViewBox(clone);const graphWidth=bounds.width,graphHeight=bounds.height;
@@ -46,6 +46,7 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
  const circles=series.flatMap(node=>[...node.querySelectorAll<SVGCircleElement>('circle')]).map(node=>({node,axis:Number(node.getAttribute('data-axis')),final:[Number(node.getAttribute('data-final-cx')||node.getAttribute('cx')),Number(node.getAttribute('data-final-cy')||node.getAttribute('cy'))]}));
  const inner=innerPoints.trim().split(/\s+/).map(pair=>pair.split(',').map(Number));
  const bars=[...clone.querySelectorAll<SVGRectElement>('[data-swing] rect')].map(node=>({node,x:Number(node.getAttribute('x')||500),width:Number(node.getAttribute('width')||0)}));
+ const bestNodes=[...clone.querySelectorAll<SVGElement>('[data-best-motion]')].map(node=>({node,opacity:node.getAttribute('opacity')}));
  const motion=pickRadarMotion();
  const setProgress=(raw:number)=>{
   const progress=ease(Math.max(0,Math.min(1,raw)));
@@ -64,6 +65,7 @@ export async function exportDynamicVideo(title:string,a:ExportSide,b:ExportSide|
    circles.forEach(({node,final})=>{node.setAttribute('cx',String(final[0]));node.setAttribute('cy',String(final[1]))})
   }
   bars.forEach(({node,x,width})=>{const current=width*progress;node.setAttribute('width',String(current));node.setAttribute('x',String(x<500?500-current:500))});
+  bestNodes.forEach(({node,opacity})=>{if(raw>=1){if(opacity===null)node.removeAttribute('opacity');else node.setAttribute('opacity',opacity)}else node.setAttribute('opacity',String(bestRevealOpacity(progress)))});
  };
 
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;

@@ -26,6 +26,7 @@ test('attribute radar renders side-specific Best emphasis with the series colors
  assert.equal($('[data-metric-value="firepower"] [data-best-label="A"]').text(),' BEST');
  assert.equal($('[data-metric-value="firepower"] [data-best-value]').first().attr('fill'),'#6aaeff');
  assert.equal($('[data-metric-value="firepower"] [data-best-value]').first().attr('filter'),'url(#radar-best-a-glow)');
+ assert.equal($('[data-metric-value="firepower"] [data-best-value]').first().attr('data-best-motion'),'true');
  assert.equal($('#radar-best-a-glow feFlood').attr('flood-color'),'#6aaeff');
  assert.equal($('[data-metric-value="entrying"] [data-best-label="B"]').attr('fill'),'#54ddc2');
 });
