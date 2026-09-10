@@ -69,6 +69,15 @@ test('reference grid stays the same size when a player exceeds the outer scale',
  assert.notEqual(standardChart('[data-series="A"] polygon').attr('points'),extremeChart('[data-series="A"] polygon').attr('points'));
 });
 
+test('outer reference border follows A color for one series and stays neutral for two',()=>{
+ const stats={kpr:.85,surviving:43,adr:85,kast:78,multiKillPct:20,rating:1.3,swing:0};
+ const single=load(renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a:stats,nameA:'A',colorA:'#ffd166'})));
+ const dual=load(renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a:stats,b:stats,nameA:'A',nameB:'B',colorA:'#ffd166',colorB:'#61dac8'})));
+ assert.equal(single('[data-reference-ring="100"]').attr('stroke'),'#ffd166');
+ assert.equal(single('[data-reference-ring="80"]').attr('stroke'),'#c7d3e2');
+ assert.equal(dual('[data-reference-ring="100"]').attr('stroke'),'#a9d0ff');
+});
+
 test('round swing uses a fixed scale and overflows equally to the left and right',()=>{
  const base={kpr:.85,surviving:43,adr:85,kast:78,multiKillPct:20,rating:1.3,firepower:80};
  const $=load(renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a:{...base,swing:7},b:{...base,swing:-7},nameA:'A',nameB:'B'})));

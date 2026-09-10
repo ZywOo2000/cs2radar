@@ -32,3 +32,12 @@ test('attribute radar renders side-specific Best emphasis with the series colors
  assert.equal($('#radar-best-a-value feSpecularLighting').attr('lighting-color'),'#ffffff');
  assert.equal($('[data-metric-value="entrying"] [data-best-label="B"]').attr('fill'),'#54ddc2');
 });
+
+test('attribute radar outer border follows A color only in single-series mode',()=>{
+ const stats=Object.fromEntries(attributes.map(metric=>[metric.key,75]));
+ const single=load(renderToStaticMarkup(createElement(Radar,{metrics:attributes,a:stats,nameA:'A',colorA:'#ff9b61'})));
+ const dual=load(renderToStaticMarkup(createElement(Radar,{metrics:attributes,a:stats,b:stats,nameA:'A',nameB:'B',colorA:'#ff9b61',colorB:'#61dac8'})));
+ assert.equal(single('[data-reference-ring="100"]').attr('stroke'),'#ff9b61');
+ assert.equal(single('[data-reference-ring="80"]').attr('stroke'),'#30404e');
+ assert.equal(dual('[data-reference-ring="100"]').attr('stroke'),'#8da1b5');
+});
