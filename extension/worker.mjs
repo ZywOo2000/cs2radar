@@ -1,5 +1,13 @@
 import {sourceUrl,mergeMatchDataset} from '../lib/hltv.ts';
-const origin='https://cs2-radar-lab.moaniq12.chatgpt.site';
+const allowedOrigins=new Set([
+ 'https://cs2-radar-lab.moaniq12.chatgpt.site',
+ 'https://cs2radar.moaniq12.workers.dev',
+ 'https://cs2shuju.top',
+ 'https://www.cs2shuju.top'
+]);
+function validSender(port){
+ try{return port.sender?.frameId===0&&allowedOrigins.has(new URL(port.sender?.url).origin)}catch{return false}
+}
 async function readDetail(source,job,progress){
  const target=sourceUrl(source.url);
  if(!/^\/stats\/matches\/(?:mapstatsid\/)?\d+\//.test(target.pathname))throw Error('无效详细页链接');
@@ -29,12 +37,12 @@ async function readDetail(source,job,progress){
  throw Error('详细页读取超时，请完成验证后重新导入');
 }
 chrome.runtime.onConnect.addListener(port=>{
- if(port.name!=='cs2-radar-v1'||port.sender?.frameId!==0||new URL(port.sender?.url||'https://invalid.test').origin!==origin){port.disconnect();return}
+ if(port.name!=='cs2-radar-v1'||!validSender(port)){port.disconnect();return}
  const jobs=new Map();
  const send=m=>{try{port.postMessage(m)}catch{}};
  port.onDisconnect.addListener(()=>{for(const j of jobs.values())j.cancelled=true;jobs.clear()});
  port.onMessage.addListener(async m=>{
-  if(m.type==='hello'){send({type:'ready',version:'1.0.5'});return}
+  if(m.type==='hello'){send({type:'ready',version:'1.0.0'});return}
   if(m.type==='ping')return;
   if(m.type==='cancel'){const j=jobs.get(m.id);if(j)j.cancelled=true;return}
   if(m.type!=='import'||typeof m.id!=='string'||m.id.length>80)return;

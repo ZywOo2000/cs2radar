@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CS2 Radar · HLTV 导入",
-  "version": "1.0.5",
+  "version": "1.0.0",
   "description": "读取你打开的 HLTV 比赛与赛事统计，返回 CS2 Radar。遇到验证需手动完成。",
   "minimum_chrome_version": "120",
   "permissions": [
@@ -18,7 +18,10 @@
   "content_scripts": [
     {
       "matches": [
-        "https://cs2-radar-lab.moaniq12.chatgpt.site/*"
+        "https://cs2-radar-lab.moaniq12.chatgpt.site/*",
+        "https://cs2radar.moaniq12.workers.dev/*",
+        "https://cs2shuju.top/*",
+        "https://www.cs2shuju.top/*"
       ],
       "js": [
         "bridge.js"

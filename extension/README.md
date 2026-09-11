@@ -1,4 +1,6 @@
-CS2 Radar · HLTV 导入扩展 v1.0.5
+CS2 Radar · HLTV 导入扩展 v1.0.0
+
+当前 v1.0.0：支持 GPT 站点、Cloudflare Workers 地址以及 cs2shuju.top（含 www），其他网站仍会被拒绝。
 
 1.0.5 更新：适配选手赛事页新版统计卡片，读取带嵌套说明的 KAST、多杀百分比、Swing、官方属性与战队，排除经济校正和单阵营数据。
 
@@ -15,7 +17,7 @@ CS2 Radar · HLTV 导入扩展 v1.0.5
 2. 在 Chrome 打开 chrome://extensions；Edge 打开 edge://extensions。
 3. 开启“开发者模式”，点击“加载已解压的扩展程序”。
 4. 选择含 manifest.json 的文件夹。
-5. 在同一个浏览器打开 https://cs2-radar-lab.moaniq12.chatgpt.site/ 并刷新。
+5. 在同一个浏览器打开受支持的雷达图网站并刷新：GPT 站点、cs2radar.moaniq12.workers.dev、cs2shuju.top 或 www.cs2shuju.top。
 6. 页面显示“扩展已连接”后粘贴 HLTV 链接，点击导入。
 
 如果网站需要登录，请使用拥有此网站访问权限的账号。

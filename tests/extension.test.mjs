@@ -14,6 +14,11 @@ function harness({result,actual,closed=false,sleep=setTimeout,status='complete',
 test('extension rejects other sites and subframes before creating tabs',()=>{
  for(const sender of [{frameId:0,url:'https://evil.test/'},{frameId:1,url:'https://cs2-radar-lab.moaniq12.chatgpt.site/'}]){const h=harness();h.connect({sender});assert.equal(h.disconnected,true);assert.equal(h.created.length,0)}
 });
+test('extension connects from every published site origin',()=>{
+ for(const url of ['https://cs2-radar-lab.moaniq12.chatgpt.site/','https://cs2radar.moaniq12.workers.dev/','https://cs2shuju.top/','https://www.cs2shuju.top/']){
+  const h=harness();h.connect({sender:{frameId:0,url}});assert.equal(h.disconnected,undefined);h.send({type:'hello'});assert.equal(h.sent.at(-1).version,'1.0.0');
+ }
+});
 test('extension validates pasted links and never opens arbitrary hosts',async()=>{
  const h=harness();h.connect();await h.send({type:'import',id:'a',url:'https://127.0.0.1/private'});assert.equal(h.created.length,0);assert.equal(h.sent.at(-1).type,'error');
 });
