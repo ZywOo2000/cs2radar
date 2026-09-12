@@ -1,6 +1,5 @@
 import {load, type CheerioAPI} from 'cheerio/slim';
 import type {Dataset,Player,Stats} from './stats';
-import {hltvImageUrl} from './hltv-avatar.ts';
 
 export class ImportError extends Error {code:string;status:number;constructor(code:string,message:string,status=422){super(message);this.code=code;this.status=status;}}
 export function sourceUrl(input:unknown):URL{
@@ -54,8 +53,6 @@ function base($:CheerioAPI,u:URL,kind:Dataset['kind']):Dataset{
  return {id:u.pathname+(u.search||''),title:title||'HLTV 统计',event,date:unix?new Date(unix).toISOString().slice(0,10):'',kind,sourceUrl:u.href,importedAt:new Date().toISOString(),scopes:[],players:[],notes:[]};
 }
 function safeLink(path:string|undefined,baseUrl:URL){if(!path)return undefined;try{return sourceUrl(new URL(path,baseUrl).href).href}catch{return undefined}}
-function avatarFrom(values:(string|undefined)[],baseUrl:URL){for(const value of values){const url=hltvImageUrl(value,baseUrl.href);if(url)return url}return undefined}
-function imageValues(node:ReturnType<CheerioAPI>){return ['src','data-src','data-original','srcset'].map(name=>node.attr(name))}
 export function parseMatch(html:string,u:URL):Dataset{
  const $=load(html),out=base($,u,'match');
  const maps=$('.mapholder').toArray().map(el=>{const m=$(el),scores=m.find('.results-team-score').toArray().map(x=>number($(x).text()));const url=m.find('.results-stats a,a.results-stats,.results-stats').attr('href');return {name:txt(m.find('.mapname').text()),statsId:url?.match(/mapstatsid\/(\d+)/)?.[1],rounds:scores.length===2&&scores.every(x=>x!==undefined)?scores[0]!+scores[1]!:undefined}});
@@ -95,9 +92,7 @@ export function parseMatch(html:string,u:URL):Dataset{
    if(rounds){stats.rounds=rounds;stats.maps=scope==='all'?maps.filter(m=>m.rounds!==undefined).length:1}
    if(mapOnly&&!stats.rounds){const left=number($('.team-left .bold').first().text()),right=number($('.team-right .bold').first().text());if(left!==undefined&&right!==undefined){stats.rounds=left+right;stats.maps=1}}
    derive(stats);
-   const avatarUrl=avatarFrom(r.find('img.bodyshot-img,img.playerBodyshot,img[src*="playerbodyshot"],.player-nick img,.playerNickname img').toArray().flatMap(x=>imageValues($(x))),u);
-   const old=people.get(id)||{id,name:nick,team:team||'战队未提供',avatarUrl,ratingVersion:v,stats:{}};
-   if(!old.avatarUrl&&avatarUrl)old.avatarUrl=avatarUrl;
+   const old=people.get(id)||{id,name:nick,team:team||'战队未提供',ratingVersion:v,stats:{}};
    // Some pages repeat hidden side/eco tables. Never merge a second row into an existing player/scope.
    if(!old.stats[scope])old.stats[scope]=stats;
    people.set(id,old);scopes.set(scope,scopeName);
@@ -142,8 +137,7 @@ export function parseEvent(html:string,u:URL,title?:string):Dataset{
   const pu=new URL(href!,u);for(const [k,v]of u.searchParams)pu.searchParams.set(k,v);
   const stats:Stats={};r.children('td').each((i,cell)=>{const k=keyFor(headers[i]||'');const raw=$(cell).text();const val=k==='multiKillPct'&&!raw.includes('%')?undefined:number(raw);if(k&&val!==undefined)stats[k]=val});
   for(const [k,sel]of Object.entries({rating:'.ratingCol',kdDiff:'.kdDiffCol'})){const val=number(r.find(sel).text());if(val!==undefined)stats[k]=val}
-  const avatarUrl=avatarFrom(r.find('.playerCol img,img.bodyshot-img,img.playerBodyshot,img[src*="playerbodyshot"]').toArray().flatMap(x=>imageValues($(x))),u);
-  out.players.push({id,name:txt(a.text()),team:r.find('.teamCol img').toArray().map(x=>$(x).attr('title')).filter(Boolean).join(' / ')||txt(r.find('.teamCol').text())||'战队未提供',profileUrl:safeLink(pu.href,u),avatarUrl,ratingVersion:version(headers.join(' ')),stats:{event:derive(stats)}});
+  out.players.push({id,name:txt(a.text()),team:r.find('.teamCol img').toArray().map(x=>$(x).attr('title')).filter(Boolean).join(' / ')||txt(r.find('.teamCol').text())||'战队未提供',profileUrl:safeLink(pu.href,u),ratingVersion:version(headers.join(' ')),stats:{event:derive(stats)}});
  });
  if(!out.players.length)throw new ImportError('NO_STATS','该赛事没有可识别的选手统计，或 HLTV 页面结构已变化。');
  out.notes=['选择选手后会继续读取其赛事详情；详情读取失败时保留已取得的赛事列表数据。'];return out;
@@ -192,9 +186,7 @@ export function parsePlayer(html:string,u:URL):Dataset{
   stats[k]=val;if(k==='rating')v=version(raw);
  });
  derive(stats);if(Object.keys(stats).length<2)throw new ImportError('NO_STATS','选手页面缺少可识别的统计字段，未导入数据。');
- const avatarNodes=$('img.bodyshot-img,img.playerBodyshot,.playerSummary img[src*="playerbodyshot"],img[src*="playerbodyshot"]').toArray();
- const avatarUrl=avatarFrom(avatarNodes.flatMap(x=>imageValues($(x))),u);
- out.scopes=[{id:'event',name:'整届赛事'}];out.players=[{id,name,team:txt($('.SummaryTeamname,.summaryTeamname').first().text())||$('.player-summary-stat-box-left-team-logo').first().attr('title')||'战队未提供',ratingVersion:v,profileUrl:u.href,avatarUrl,detailLoaded:true,stats:{event:stats}}];
+ out.scopes=[{id:'event',name:'整届赛事'}];out.players=[{id,name,team:txt($('.SummaryTeamname,.summaryTeamname').first().text())||$('.player-summary-stat-box-left-team-logo').first().attr('title')||'战队未提供',ratingVersion:v,profileUrl:u.href,detailLoaded:true,stats:{event:stats}}];
  out.notes=['只使用此链接赛事筛选范围内的数据。页面未提供的指标显示为缺失。'];return out;
 }
 export async function importHltv(input:unknown,fetcher:typeof fetch=fetch):Promise<Dataset>{
