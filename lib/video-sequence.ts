@@ -9,7 +9,7 @@ export const SEQUENCE_HOLD_MS=700;
 export const SEQUENCE_FINAL_HOLD_MS=1000;
 export const SEQUENCE_CENTER_ENTRY_MS=1650;
 
-export type SequenceParticipant={name:string;context:string;stats:Stats;color:string;bestKeys:string[];ratingVersion:string};
+export type SequenceParticipant={name:string;team:string;context:string;source:string;avatarUrl?:string;avatarDataUrl?:string;stats:Stats;color:string;bestKeys:string[];ratingVersion:string};
 export type SequenceFrame={stats:Stats;color:string;bestKeys:string[];bestOpacity:number;fromIndex:number;toIndex:number;mix:number;nameFromOpacity:number;nameToOpacity:number;done:boolean};
 
 const clamp=(v:number)=>Math.max(0,Math.min(1,v));

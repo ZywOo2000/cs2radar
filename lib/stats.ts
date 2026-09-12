@@ -1,5 +1,5 @@
 export type Stats = Partial<Record<string, number>>;
-export type Player = {id:string;name:string;team:string;profileUrl?:string;stats:Record<string,Stats>;ratingVersion:string;detailLoaded?:boolean};
+export type Player = {id:string;name:string;team:string;profileUrl?:string;avatarUrl?:string;stats:Record<string,Stats>;ratingVersion:string;detailLoaded?:boolean};
 export type Dataset = {id:string;title:string;event:string;date:string;kind:'match'|'event'|'player';sourceUrl:string;importedAt:string;scopes:{id:string;name:string}[];players:Player[];notes:string[];demo?:boolean};
 export type Metric = {key:string;label:string;name:string;min:number;max:number;decimals:number;unit?:string;inverse?:boolean;description:string};
 export const performance:Metric[] = [
