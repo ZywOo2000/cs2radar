@@ -7,8 +7,8 @@ export function sourceUrl(input:unknown):URL{
  let u:URL;try{u=new URL(input.trim())}catch{throw new ImportError('INVALID_URL','请输入完整链接，例如 https://www.hltv.org/matches/…',400)}
  if(u.protocol!=='https:'||!['hltv.org','www.hltv.org'].includes(u.hostname)||u.port||u.username||u.password)throw new ImportError('INVALID_URL','仅支持 https://www.hltv.org/ 下的公开比赛和赛事页面。',400);
  const p=u.pathname;
- if(!/^\/(?:matches\/\d+\/[^/]+|events\/\d+\/[^/]+|stats\/matches\/(?:mapstatsid\/)?\d+\/[^/]+|stats\/players(?:\/\d+\/[^/]+)?)\/?$/.test(p))throw new ImportError('UNSUPPORTED_URL','请使用比赛详情、赛事详情或带赛事筛选的选手统计链接。',400);
- if(p.startsWith('/stats/players')&&!/^\d+$/.test(u.searchParams.get('event')||''))throw new ImportError('EVENT_REQUIRED','选手统计链接必须带有赛事筛选（event=赛事编号），以明确统计范围。',400);
+ if(!/^\/(?:matches\/\d+\/[^/]+|events\/\d+\/[^/]+|stats\/matches\/(?:mapstatsid\/)?\d+\/[^/]+|stats\/players(?:\/\d+\/[^/]+)?)\/?$/.test(p))throw new ImportError('UNSUPPORTED_URL','请使用比赛详情、赛事详情或 HLTV 选手统计链接。',400);
+ if(p.startsWith('/stats/players')&&u.searchParams.has('event')&&!/^\d+$/.test(u.searchParams.get('event')||''))throw new ImportError('INVALID_EVENT','赛事筛选必须是数字编号。',400);
  const clean=new URL(p,'https://www.hltv.org');
  for(const key of ['event','startDate','endDate','maps','matchType','rankingFilter','minMapCount']){
   const val=u.searchParams.get(key);if(val!==null)clean.searchParams.set(key,val);
@@ -51,6 +51,15 @@ function base($:CheerioAPI,u:URL,kind:Dataset['kind']):Dataset{
  const event=txt($('.timeAndEvent .event a,.event-hub-title,.eventname,.event-name').first().text())||txt($('a[href*="?event="]').filter((_,el)=>!$(el).closest('table').length).first().text());
  const unix=number($('.timeAndEvent .date,[data-time-format][data-unix]').first().attr('data-unix'));
  return {id:u.pathname+(u.search||''),title:title||'HLTV 统计',event,date:unix?new Date(unix).toISOString().slice(0,10):'',kind,sourceUrl:u.href,importedAt:new Date().toISOString(),scopes:[],players:[],notes:[]};
+}
+function playerScopeName(u:URL){
+ const event=u.searchParams.get('event');
+ if(event&&/^\d+$/.test(event))return '整届赛事';
+ const start=u.searchParams.get('startDate'),end=u.searchParams.get('endDate');
+ if(start&&end)return `${start} 至 ${end}`;
+ if(start)return `${start} 起`;
+ if(end)return `截至 ${end}`;
+ return '全部历史';
 }
 function safeLink(path:string|undefined,baseUrl:URL){if(!path)return undefined;try{return sourceUrl(new URL(path,baseUrl).href).href}catch{return undefined}}
 export function parseMatch(html:string,u:URL):Dataset{
@@ -186,8 +195,9 @@ export function parsePlayer(html:string,u:URL):Dataset{
   stats[k]=val;if(k==='rating')v=version(raw);
  });
  derive(stats);if(Object.keys(stats).length<2)throw new ImportError('NO_STATS','选手页面缺少可识别的统计字段，未导入数据。');
- out.scopes=[{id:'event',name:'整届赛事'}];out.players=[{id,name,team:txt($('.SummaryTeamname,.summaryTeamname').first().text())||$('.player-summary-stat-box-left-team-logo').first().attr('title')||'战队未提供',ratingVersion:v,profileUrl:u.href,detailLoaded:true,stats:{event:stats}}];
- out.notes=['只使用此链接赛事筛选范围内的数据。页面未提供的指标显示为缺失。'];return out;
+ const scopeName=playerScopeName(u);
+ out.scopes=[{id:'event',name:scopeName}];out.players=[{id,name,team:txt($('.SummaryTeamname,.summaryTeamname').first().text())||$('.player-summary-stat-box-left-team-logo').first().attr('title')||'战队未提供',ratingVersion:v,profileUrl:u.href,detailLoaded:true,stats:{event:stats}}];
+ out.notes=[u.searchParams.get('event')?'只使用此链接赛事筛选范围内的数据。':`只使用此链接筛选范围内的数据（${scopeName}）。`,'页面未提供的指标显示为缺失。'];return out;
 }
 export async function importHltv(input:unknown,fetcher:typeof fetch=fetch):Promise<Dataset>{
  const u=sourceUrl(input);
