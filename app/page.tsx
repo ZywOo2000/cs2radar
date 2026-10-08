@@ -78,6 +78,9 @@ import {
 } from '@/lib/video-sequence';
 import { useHltvExtension } from '@/lib/extension-client';
 import { ExtensionGuide } from '@/components/extension-guide';
+import { ManualEditor } from '@/components/manual-editor';
+import { useManualDraft } from '@/hooks/use-manual-draft';
+import { manualDataset, parseManual, MANUAL_LABEL } from '@/lib/manual-data';
 type Transport = 'auto' | 'server' | 'extension';
 type Slot = {
   url: string;
@@ -456,6 +459,9 @@ function SourcePanel({
 }
 export default function Home() {
   const extension = useHltvExtension();
+  const manual = useManualDraft();
+  const manualResult = useMemo(() => parseManual(manual.draft), [manual.draft]);
+  const manualData = useMemo(() => manualDataset(manual.draft), [manual.draft]);
   const [transport, setTransport] = useState<Transport>('auto');
   const controllers = useRef<(AbortController | null)[]>([
     null,
@@ -479,13 +485,15 @@ export default function Home() {
     ...DEFAULT_SERIES_COLORS,
   ]);
   const [mode, setMode] = useState('compare'),
-    [view, setView] = useState('performance'),
+    [importView, setView] = useState('performance'),
     [activeSlot, setActiveSlot] = useState(0),
     [showAllStats, setShowAllStats] = useState(false),
     [exporting, setExporting] = useState(false),
     [exportingVideo, setExportingVideo] = useState(false),
     [videoProgress, setVideoProgress] = useState(0),
     [notice, setNotice] = useState('');
+  const isManual = mode === 'manual';
+  const view = isManual ? 'performance' : importView;
   function update(i: number, patch: Partial<Slot>) {
     const next = [...ref.current];
     next[i] = { ...next[i], ...patch };
@@ -675,7 +683,8 @@ export default function Home() {
       return copy;
     });
   }
-  const a = slots[0],
+  const manualSlot: Slot = { ...empty(), data: manualData, playerId: 'manual', scopeId: 'manual', bestKeys: manual.draft.bestKeys };
+  const a = isManual ? manualSlot : slots[0],
     b = slots[1],
     pa = player(a),
     pb = player(b),
@@ -683,6 +692,7 @@ export default function Home() {
     sb = stats(b),
     comp = mode === 'compare',
     isVideo = mode === 'video';
+  const primaryColor = isManual ? manual.draft.color : seriesColors[0];
   const ms = view === 'performance' ? broadcastMetrics : attributes;
   const bestOptions =
     view === 'performance'
@@ -724,20 +734,20 @@ export default function Home() {
   );
   const sequenceReady =
     videoPeople.length >= 2 && sequenceComparable.length >= 3;
-  const ready = isVideo ? sequenceReady : comparable.length >= 3;
+  const ready = isManual ? manual.loaded && manualResult.ready : isVideo ? sequenceReady : comparable.length >= 3;
   const radarMetrics = view === 'performance' ? ms : ready ? comparable : ms;
   const excluded = ms.filter((m) => !comparable.includes(m));
   const anyData = isVideo
       ? slots.some((s) => !!s.data)
       : !!(a.data || (comp && b.data)),
     hasDemo = !!(a.data?.demo || (comp && b.data?.demo));
-  const busy = slots.some((s) => s.busy);
+  const busy = !isManual && slots.some((s) => s.busy);
   const [sequencePlaying, setSequencePlaying] = useState(false);
   const graphEmpty = anyData && !ready;
   const displayed = view === 'performance' ? sa : ready ? sa : {};
   const displayedB =
     comp && pb && (view === 'performance' || ready) ? sb : undefined;
-  const tableMetrics = [
+  const allTableMetrics = [
     ...ms,
     ...(view === 'performance'
       ? [
@@ -756,6 +766,7 @@ export default function Home() {
     'firepower',
     'swing',
   ]);
+  const tableMetrics = isManual ? allTableMetrics.filter(m => keyMetricKeys.has(m.key)) : allTableMetrics;
   const visibleTableMetrics = showAllStats
     ? tableMetrics
     : tableMetrics.filter((metric) => keyMetricKeys.has(metric.key));
@@ -765,6 +776,7 @@ export default function Home() {
     pb &&
     (pa.ratingVersion !== pb.ratingVersion || pa.ratingVersion === '未标注');
   async function download() {
+    if (!ready || busy || exporting || exportingVideo) return;
     setExporting(true);
     setNotice('');
     try {
@@ -777,7 +789,8 @@ export default function Home() {
         {
           name: pa.name,
           context: context(a),
-          source: pa.profileUrl || a.data?.sourceUrl || '',
+          source: isManual ? MANUAL_LABEL : pa.profileUrl || a.data?.sourceUrl || '',
+          manual: isManual,
           version: pa.ratingVersion,
           stats: sa,
           demo: !!a.data?.demo,
@@ -801,7 +814,7 @@ export default function Home() {
     }
   }
   async function downloadVideo() {
-    if (videoExportLock.current) return;
+    if (videoExportLock.current || !ready || busy || exporting) return;
     videoExportLock.current = true;
     setExportingVideo(true);
     setVideoProgress(0);
@@ -842,6 +855,8 @@ export default function Home() {
   }
   const actions = useRef({ load, choose });
   actions.current = { load, choose };
+  const manualRef = useRef(manual.draft);
+  manualRef.current = manual.draft;
   const configRef = useRef({ mode, view });
   configRef.current = { mode, view };
   useEffect(() => {
@@ -882,6 +897,7 @@ export default function Home() {
     const read = () => ({
       mode: configRef.current.mode,
       view: configRef.current.view,
+      manual: { ...manualRef.current, ...parseManual(manualRef.current), source: MANUAL_LABEL },
       slots: ref.current.map((s, i) => ({
         slot: 'ABCDE'[i],
         source: s.data?.sourceUrl || null,
@@ -930,7 +946,7 @@ export default function Home() {
             slot: { enum: ['A', 'B', 'C', 'D', 'E'] },
             playerId: { type: 'string' },
             scopeId: { type: 'string' },
-            mode: { enum: ['single', 'compare', 'video'] },
+            mode: { enum: ['single', 'compare', 'video', 'manual'] },
           },
           required: ['slot', 'playerId'],
           additionalProperties: false,
@@ -947,7 +963,7 @@ export default function Home() {
             !x ||
             !['A', 'B', 'C', 'D', 'E'].includes(x.slot || '') ||
             typeof x.playerId !== 'string' ||
-            (x.mode && !['single', 'compare', 'video'].includes(x.mode))
+            (x.mode && !['single', 'compare', 'video', 'manual'].includes(x.mode))
           )
             throw new Error('选择参数无效。');
           await actions.current.choose(
@@ -1013,7 +1029,7 @@ export default function Home() {
               数据雷达图<span className="heading-dot">.</span>
             </h1>
             <p>
-              {isVideo
+              {isManual ? '手动填写比赛表现，实时生成雷达图并导出。' : isVideo
                 ? '按顺序将 2–5 位选手的数据连续变形并导出视频。'
                 : comp
                   ? '独立选择两份数据，快速完成赛场表现对比。'
@@ -1023,6 +1039,7 @@ export default function Home() {
           <div className="heading-actions">
             <button
               className="button secondary"
+              hidden={isManual}
               onClick={showDemo}
               disabled={busy || exportingVideo}
             >
@@ -1066,7 +1083,7 @@ export default function Home() {
             </div>
           </div>
         </section>
-        <div className="extension-bar">
+        {!isManual && <div className="extension-bar">
           <div>
             <Database size={18} />
             <strong>
@@ -1094,11 +1111,12 @@ export default function Home() {
             disabled={busy}
           />
           <ExtensionGuide connected={extension.connected} />
-        </div>
+        </div>}
         <div className="workspace-toolbar">
           <Tabs
             value={mode}
             onValueChange={(v) => {
+              if (exporting || exportingVideo) return;
               const nextMode = String(v);
               setMode(nextMode);
               setActiveSlot(nextMode === 'video' ? 0 : Math.min(activeSlot, 1));
@@ -1110,6 +1128,7 @@ export default function Home() {
                 双人对比
               </TabsTrigger>
               <TabsTrigger value="single">单人展示</TabsTrigger>
+              <TabsTrigger value="manual">手动填写</TabsTrigger>
               <TabsTrigger value="video">
                 <Video size={15} />
                 视频模式
@@ -1311,7 +1330,7 @@ export default function Home() {
         ) : (
           <>
             <section
-              className={'comparison-workspace ' + (!comp ? 'single' : '')}
+              className={'comparison-workspace ' + (!comp ? 'single' : '') + (isManual ? ' manual-workspace' : '')}
             >
               <div className="control-console">
                 <div className="console-heading">
@@ -1350,11 +1369,15 @@ export default function Home() {
                     })}
                   </div>
                 )}
-                {!comp || activeSlot === 0 ? (
+                {isManual ? <ManualEditor draft={manual.draft} onChange={manual.setDraft}
+                  errors={manualResult.errors} count={manualResult.count} storageMessage={manual.storageMessage}
+                  disabled={!manual.loaded || exporting || exportingVideo}
+                  colors={<ColorEditor side="a" color={primaryColor} onChange={color => manual.setDraft(d => ({ ...d, color }))} />}
+                /> : !comp || activeSlot === 0 ? (
                   <SourcePanel
                     side="a"
                     slot={a}
-                    color={seriesColors[0]}
+                    color={primaryColor}
                     setColor={(color) => setSeriesColor(0, color)}
                     bestOptions={bestOptions}
                     toggleBest={(key) => toggleBest(0, key)}
@@ -1401,7 +1424,7 @@ export default function Home() {
                           : '等待数据'}
                   </span>
                 </div>
-                <Tabs
+                {!isManual && <Tabs
                   value={view}
                   onValueChange={(v) => setView(String(v))}
                   className="chart-tabs"
@@ -1410,7 +1433,8 @@ export default function Home() {
                     <TabsTrigger value="performance">比赛指标</TabsTrigger>
                     <TabsTrigger value="attributes">HLTV 属性</TabsTrigger>
                   </TabsList>
-                </Tabs>
+                </Tabs>}
+                {isManual && <p className="manual-provenance">{MANUAL_LABEL}</p>}
                 <div className="chart-wrap">
                   <Radar
                     metrics={radarMetrics}
@@ -1421,7 +1445,7 @@ export default function Home() {
                     drawKeys={comparable.map((m) => m.key)}
                     bestA={a.bestKeys}
                     bestB={b.bestKeys}
-                    colorA={seriesColors[0]}
+                    colorA={primaryColor}
                     colorB={seriesColors[1]}
                     dataKey={[
                       mode,
@@ -1444,11 +1468,12 @@ export default function Home() {
                     </div>
                   )}
                 </div>
+                {isManual && !ready && <p className="manual-provenance" role="status">{Object.keys(manualResult.errors).length ? '请修正左侧无效数值后再导出。' : '至少填写三项雷达指标后即可导出。'}</p>}
                 <div className="chart-caption">
-                  <span style={{ color: seriesColors[0] }}>
+                  <span style={{ color: primaryColor }}>
                     <i
                       className="legend-dot"
-                      style={{ background: seriesColors[0] }}
+                      style={{ background: primaryColor }}
                     />
                     A · {pa?.name || '等待选择'}
                   </span>
@@ -1475,7 +1500,7 @@ export default function Home() {
                     </output>
                   ))}
                 <p className="chart-note">
-                  {hasDemo
+                  {isManual ? MANUAL_LABEL : hasDemo
                     ? '示例数值为虚构数据，不代表真实选手。'
                     : view === 'attributes'
                       ? '属性用于描述打法倾向，并非所有分数都越高越好。'
@@ -1505,14 +1530,14 @@ export default function Home() {
             </span>
           </div>
         )}
-        <section className="data-section">
+        <section className={"data-section" + (isManual ? " manual-data-section" : "")}>
           <div className="section-heading">
             <div>
               <div className="eyebrow">THE NUMBERS</div>
               <h2>原始数据</h2>
             </div>
             <div className="section-heading-actions">
-              <span className="muted small">“暂无”表示来源未提供</span>
+              <span className="muted small">{isManual ? '“暂无”表示尚未填写' : '“暂无”表示来源未提供'}</span>
               {anyData && tableMetrics.length > visibleTableMetrics.length && (
                 <button
                   className="button secondary compact-button"
@@ -1541,7 +1566,7 @@ export default function Home() {
                   <TableHead>数据指标</TableHead>
                   <TableHead
                     className="text-a"
-                    style={{ color: seriesColors[0] }}
+                    style={{ color: primaryColor }}
                   >
                     A · {pa?.name || '未选择'}
                     <small>
@@ -1592,7 +1617,7 @@ export default function Home() {
                       </TableCell>
                       <TableCell
                         className="numeric text-a"
-                        style={{ color: seriesColors[0] }}
+                        style={{ color: primaryColor }}
                       >
                         {format(av, m)}
                       </TableCell>
