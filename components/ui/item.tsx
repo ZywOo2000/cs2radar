@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 function ItemGroup({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- Polymorphic item children are not required to render li; preserve the ARIA list and div ref contract.
       role="list"
       data-slot="item-group"
       className={cn(

@@ -10,6 +10,12 @@ import {attributes} from '../lib/stats.ts';
 await build({entryPoints:['components/radar.tsx'],outfile:'.checks/radar-component.mjs',bundle:true,platform:'node',format:'esm',packages:'external',jsx:'automatic',alias:{'@':resolve('.')}});
 const {Radar}=await import('../.checks/radar-component.mjs');
 
+test('missing attribute values cannot retain a Best label',()=>{
+ const $=load(renderToStaticMarkup(createElement(Radar,{metrics:attributes,a:{entrying:0},nameA:'A',bestA:['firepower','entrying']})));
+ assert.equal($('[data-metric-value="firepower"] [data-best-label]').length,0);
+ assert.equal($('[data-metric-value="entrying"] [data-best-label]').length,1);
+});
+
 test('attribute radar exposes its fixed inner polygon and final geometry for animation and video export',()=>{
  const stats=Object.fromEntries(attributes.map((metric,index)=>[metric.key,55+index*5]));
  const $=load(renderToStaticMarkup(createElement(Radar,{metrics:attributes,a:stats,nameA:'A'})));

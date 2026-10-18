@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {extractorScript} from './helpers/extension-bundle.mjs';
 import vm from 'node:vm';
 import {parseMatch,sourceUrl,matchDetailSources,mergeMatchDetails} from '../lib/hltv.ts';
 const url='https://www.hltv.org/matches/2396950/mouz-vs-vitality-blast-open-porto-2026';
@@ -27,7 +27,7 @@ test('zero multi-kill rounds stay zero and invalid counts do not become percenta
 });
 test('browser extractor follows detail source and preserves base stats if detail fetch fails',async()=>{
  let blocked=false;const context={URL,Date,atob,AbortController,TextDecoder,setTimeout,clearTimeout,document:{readyState:'interactive',title:'HLTV',querySelector:()=>null,documentElement:{outerHTML:baseHtml}},location:{href:url,hostname:'www.hltv.org'},fetch:async target=>{assert.equal(target,detailUrl);if(blocked)throw Error('403');return new Response(detail,{headers:{'content-type':'text/html'}})}};
- vm.createContext(context);vm.runInContext(readFileSync('.checks/extension-package/extractor.js','utf8'),context);
+ vm.createContext(context);vm.runInContext(extractorScript,context);
  const result=await context.__cs2RadarExtract();assert.equal(result.status,'success');assert.equal(result.data.players[0].stats.all.multiKillPct,9/44*100);
  blocked=true;const fallback=await context.__cs2RadarExtract();assert.equal(fallback.status,'success');assert.equal(fallback.data.players[0].stats.all.rating,1.61);assert.equal(fallback.data.players[0].stats.all.multiKillPct,undefined);assert.equal(fallback.remainingDetails[0].url,detailUrl);assert.equal(fallback.remainingDetails[0].reason,'403');
 });

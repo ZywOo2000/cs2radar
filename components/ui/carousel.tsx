@@ -6,6 +6,7 @@ import useEmblaCarousel, {
 } from 'embla-carousel-react';
 
 import { cn } from '@/lib/utils';
+import { createCarouselStore } from '@/lib/carousel-store';
 import { Button } from '@/components/ui/button';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 
@@ -58,14 +59,14 @@ function Carousel({
     },
     plugins,
   );
-  const [canScrollPrev, setCanScrollPrev] = React.useState(false);
-  const [canScrollNext, setCanScrollNext] = React.useState(false);
-
-  const onSelect = React.useCallback((api: CarouselApi) => {
-    if (!api) return;
-    setCanScrollPrev(api.canScrollPrev());
-    setCanScrollNext(api.canScrollNext());
-  }, []);
+  const store = React.useMemo(() => createCarouselStore(api), [api]);
+  const scrollability = React.useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getServerSnapshot,
+  );
+  const canScrollPrev = Boolean(scrollability & 1);
+  const canScrollNext = Boolean(scrollability & 2);
 
   const scrollPrev = React.useCallback(() => {
     api?.scrollPrev();
@@ -93,17 +94,6 @@ function Carousel({
     setApi(api);
   }, [api, setApi]);
 
-  React.useEffect(() => {
-    if (!api) return;
-    onSelect(api);
-    api.on('reInit', onSelect);
-    api.on('select', onSelect);
-
-    return () => {
-      api?.off('select', onSelect);
-    };
-  }, [api, onSelect]);
-
   return (
     <CarouselContext.Provider
       value={{
@@ -121,6 +111,7 @@ function Carousel({
       <div
         onKeyDownCapture={handleKeyDown}
         className={cn('relative', className)}
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- The carousel exposes a region while preserving its HTMLDivElement ref contract.
         role="region"
         aria-roledescription="carousel"
         data-slot="carousel"
@@ -158,6 +149,7 @@ function CarouselItem({ className, ...props }: React.ComponentProps<'div'>) {
 
   return (
     <div
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- A carousel slide is a generic ARIA group, not a form fieldset.
       role="group"
       aria-roledescription="slide"
       data-slot="carousel-item"

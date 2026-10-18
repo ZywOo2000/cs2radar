@@ -76,6 +76,7 @@ function Field({
 }: React.ComponentProps<'div'> & VariantProps<typeof fieldVariants>) {
   return (
     <div
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- This is the layout group for one field; the separate FieldSet component supplies fieldset semantics.
       role="group"
       data-slot="field"
       data-orientation={orientation}

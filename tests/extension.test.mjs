@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {readFileSync} from 'node:fs';
+import {workerScript,extractorScript} from './helpers/extension-bundle.mjs';
 import {parsePlayer,sourceUrl} from '../lib/hltv.ts';
 import {normalized,performance} from '../lib/stats.ts';
 function harness({result,actual,closed=false,sleep=setTimeout,status='complete',tabs=[],clock=Date}={}){
  let onConnect,listener,disconnect,installed=false;const sent=[],created=[],injections=[];
  const chrome={runtime:{onConnect:{addListener:fn=>onConnect=fn}},tabs:{query:async()=>tabs,create:async args=>{created.push(args);return {id:created.length}},get:async id=>{if(closed)throw Error();return {status,url:actual||tabs.find(t=>t.id===id)?.url||created[id-1].url}}},scripting:{executeScript:async args=>{assert.equal(args.injectImmediately,true);if(args.files){injections.push(args);installed=true;return []}return [{result:installed?((typeof result==="function"?result(args.target.tabId):result)||{status:'success',data:{notes:[],players:[],scopes:[]}}):{status:'not-injected'}}]}}};
- vm.runInNewContext(readFileSync('.checks/extension-package/worker.js','utf8'),{chrome,URL,setTimeout:sleep,Date:clock,console,atob});
+ vm.runInNewContext(workerScript,{chrome,URL,setTimeout:sleep,Date:clock,console,atob});
  const port={name:'cs2-radar-v1',sender:{frameId:0,url:'https://cs2-radar-lab.moaniq12.chatgpt.site/'},postMessage:m=>sent.push(m),disconnect:()=>disconnect=true,onDisconnect:{addListener:()=>{}},onMessage:{addListener:fn=>listener=fn}};
  return {connect:(patch={})=>{Object.assign(port,patch);onConnect(port)},send:m=>listener(m),sent,created,injections,get disconnected(){return disconnect}};
 }
@@ -43,7 +43,7 @@ test('over-reference ADR/Rating/Swing remain proportional without upper clipping
 });
 
 test('challenge progress resumes automatically and keeps the request id',async()=>{
- let passes=0;const h=harness({result:()=>++passes===1?{status:'waiting',message:'请完成验证'}:{status:'success',data:{notes:[]}},sleep:fn=>setTimeout(fn,0)});
+ let passes=0;const h=harness({result:()=>++passes===1?{status:'waiting',message:'请完成验证'}:{status:'success',data:{notes:[]}},sleep:fn=>setTimeout(()=>fn(),0)});
  h.connect();await h.send({type:'import',id:'challenge',url:'https://www.hltv.org/events/8038/example'});
  assert.ok(h.sent.some(m=>m.type==='progress'&&m.message==='请完成验证'));assert.equal(h.sent.at(-1).type,'result');assert.equal(h.sent.at(-1).id,'challenge');
  assert.equal(h.injections.length,1);
@@ -60,12 +60,12 @@ test('a different event filter is never reused',async()=>{
 });
 
 test('persistent missing statistics fail early instead of waiting three minutes',async()=>{
- let now=1000;const h=harness({clock:{now:()=>now},result:{status:'error',message:'没有统计'},sleep:fn=>{now+=200;return setTimeout(fn,0)}});h.connect();
+ let now=1000;const h=harness({clock:{now:()=>now},result:{status:'error',message:'没有统计'},sleep:fn=>{now+=200;return setTimeout(()=>fn(),0)}});h.connect();
  await h.send({type:'import',id:'no-stats',url:'https://www.hltv.org/stats/players?event=8038'});
  assert.equal(h.sent.at(-1).type,'error');assert.match(h.sent.at(-1).message,/10 秒/);assert.ok(now<15000);assert.equal(h.injections.length,1);
 });
 test('cancelled verification never emits a later success',async()=>{
- const h=harness({result:{status:'waiting',message:'请完成验证'},sleep:fn=>setTimeout(fn,0)});h.connect();
+ const h=harness({result:{status:'waiting',message:'请完成验证'},sleep:fn=>setTimeout(()=>fn(),0)});h.connect();
  const running=h.send({type:'import',id:'cancel-me',url:'https://www.hltv.org/events/8038/example'});
  await new Promise(r=>setTimeout(r,1));await h.send({type:'cancel',id:'cancel-me'});await running;
  assert.equal(h.sent.some(m=>m.type==='result'||m.type==='error'),false);
@@ -73,7 +73,7 @@ test('cancelled verification never emits a later success',async()=>{
 test('bundled extractor runs with browser globals and returns structured player data',async()=>{
  const html='<span class="summaryNickname">TEST</span><div class="stats-row"><span>Rating 3.0</span><span>1.34</span></div><div class="stats-row"><span>Damage / Round</span><span>92.4</span></div>';
  const context={URL,Date,atob,document:{title:'TEST stats | HLTV.org',querySelector:()=>null,documentElement:{outerHTML:html}},location:{href:'https://www.hltv.org/stats/players/10/test?event=8038'}};
- vm.createContext(context);vm.runInContext(readFileSync('.checks/extension-package/extractor.js','utf8'),context);
+ vm.createContext(context);vm.runInContext(extractorScript,context);
  const result=await context.__cs2RadarExtract();assert.equal(result.status,'success');assert.equal(result.data.players[0].stats.event.adr,92.4);
  context.document.readyState='loading';assert.equal((await context.__cs2RadarExtract()).status,'waiting');
  context.document.readyState='interactive';assert.equal((await context.__cs2RadarExtract()).status,'success');

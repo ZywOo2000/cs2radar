@@ -1,9 +1,13 @@
 'use client';
+// Inline SVG must keep its image role; an HTML img cannot contain chart geometry.
+/* oxlint-disable jsx-a11y/prefer-tag-over-role */
 import {useLayoutEffect,useState} from 'react';
 import {format,normalized,screenshotReference,performance,type Metric,type Stats} from '@/lib/stats';
 import {RadarModeControls,useRadarMotion,useRadarRingPlayback} from './radar-motion-controls';
 
-export function BroadcastRadar({metrics,a,b,nameA,nameB,drawKeys,bestA=[],bestB=[],dataKey,colorA='#bddbff',colorB='#61dac8',showControls=true,bestOpacity=1}:{metrics:Metric[];a:Stats;b?:Stats;nameA:string;nameB?:string;drawKeys?:string[];bestA?:string[];bestB?:string[];dataKey?:string;colorA?:string;colorB?:string;showControls?:boolean;bestOpacity?:number}){
+export function BroadcastRadar({metrics,a,b,nameA,nameB,drawKeys,bestA:requestedBestA=[],bestB:requestedBestB=[],dataKey,colorA='#bddbff',colorB='#61dac8',showControls=true,bestOpacity=1}:{metrics:Metric[];a:Stats;b?:Stats;nameA:string;nameB?:string;drawKeys?:string[];bestA?:string[];bestB?:string[];dataKey?:string;colorA?:string;colorB?:string;showControls?:boolean;bestOpacity?:number}){
+ const bestA=requestedBestA.filter(key=>Number.isFinite(a[key]));
+ const bestB=requestedBestB.filter(key=>Number.isFinite(b?.[key]));
  const [reference,setReference]=useState(true);
  const motion=useRadarMotion(dataKey||[nameA,nameB,...metrics.flatMap(m=>[a[m.key],b?.[m.key]])].join('|'));
  const svgRef=useRadarRingPlayback(motion.mode,motion.kind,motion.runId);

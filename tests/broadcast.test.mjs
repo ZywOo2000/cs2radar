@@ -10,6 +10,12 @@ import {parsePlayer,sourceUrl} from '../lib/hltv.ts';
 
 await build({entryPoints:['components/broadcast-radar.tsx'],outfile:'.checks/broadcast-component.mjs',bundle:true,platform:'node',format:'esm',packages:'external',jsx:'automatic',alias:{'@':resolve('.')}});
 const {BroadcastRadar}=await import('../.checks/broadcast-component.mjs');
+
+test('missing broadcast metrics do not show Best; a real zero still can',()=>{
+ const $=load(renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a:{kpr:0},nameA:'A',bestA:['kpr','rating','swing','firepower']})));
+ assert.equal($('[data-best-label-for]').length,1);
+ assert.equal($('[data-best-label-for]').text(),'Best');
+});
 test('reference screenshot thresholds all land on the same outer ring and permit overflow',()=>{
  assert.deepEqual(broadcastMetrics.map(m=>m.max),[.85,43,85,78,20,1.3]);
  assert.deepEqual(broadcastMetrics.map(m=>m.min),[.42,15.7,47.5,54.5,7,.55]);
