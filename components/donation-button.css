@@ -8,13 +8,13 @@
   --donation-angle: 0deg;
   --donation-spectrum: conic-gradient(
     from var(--donation-angle),
-    #78b4ff,
-    #a78bfa,
-    #f093d0,
-    #ff9d82,
-    #f4d484,
-    #93dca4,
-    #78b4ff
+    #4285ff,
+    #9855ff,
+    #ed48b1,
+    #ff743d,
+    #ffcb3d,
+    #23ce88,
+    #4285ff
   );
   position: relative;
   isolation: isolate;
@@ -31,8 +31,8 @@
   inset: -3px;
   border-radius: inherit;
   background: var(--donation-spectrum);
-  filter: blur(10px);
-  opacity: 0.4;
+  filter: blur(6px);
+  opacity: 0.65;
   pointer-events: none;
   transition: opacity 180ms ease;
 }
@@ -64,7 +64,7 @@
 
 .donation-control:hover::before,
 .donation-control:focus-within::before {
-  opacity: 0.65;
+  opacity: 0.85;
 }
 
 .donation-button:hover {
@@ -72,7 +72,7 @@
 }
 
 .donation-button:focus-visible {
-  outline: 2px solid #dfd4ff;
+  outline: 2px solid #9c78ff;
   outline-offset: 5px;
 }
 
@@ -88,11 +88,13 @@
 .donation-button__pulse {
   position: absolute;
   inset: -3px;
-  border: 1px solid #d6c6ff;
+  border: 1px solid transparent;
   border-radius: inherit;
-  box-shadow:
-    0 0 8px #b391ff66,
-    inset 0 0 8px #8bbaff33;
+  background: var(--donation-spectrum) border-box;
+  mask:
+    linear-gradient(#fff 0 0) padding-box,
+    linear-gradient(#fff 0 0) border-box;
+  mask-composite: exclude;
   opacity: 0;
   transform: scale(1.32, 1.65);
   pointer-events: none;
