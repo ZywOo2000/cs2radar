@@ -1,0 +1,134 @@
+@property --donation-angle {
+  syntax: '<angle>';
+  inherits: true;
+  initial-value: 0deg;
+}
+
+.donation-control {
+  --donation-angle: 0deg;
+  --donation-spectrum: conic-gradient(
+    from var(--donation-angle),
+    #78b4ff,
+    #a78bfa,
+    #f093d0,
+    #ff9d82,
+    #f4d484,
+    #93dca4,
+    #78b4ff
+  );
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  animation: donation-orbit 5s linear infinite;
+}
+
+.donation-control::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -3px;
+  border-radius: inherit;
+  background: var(--donation-spectrum);
+  filter: blur(10px);
+  opacity: 0.4;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.donation-button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  min-width: 94px;
+  min-height: 44px;
+  padding: 8px 24px;
+  border: 2px solid transparent;
+  border-radius: inherit;
+  background:
+    linear-gradient(#101117, #101117) padding-box,
+    var(--donation-spectrum) border-box;
+  color: #f2f1f7;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 180ms ease;
+}
+
+.donation-control:hover::before,
+.donation-control:focus-within::before {
+  opacity: 0.65;
+}
+
+.donation-button:hover {
+  color: #fff;
+}
+
+.donation-button:focus-visible {
+  outline: 2px solid #dfd4ff;
+  outline-offset: 5px;
+}
+
+.donation-button:active {
+  transform: scale(0.94);
+}
+
+.donation-button__label {
+  position: relative;
+}
+
+/* Press primes the ring; releasing lets it expand and fade, even on repeated clicks. */
+.donation-button__pulse {
+  position: absolute;
+  inset: -3px;
+  border: 1px solid #d6c6ff;
+  border-radius: inherit;
+  box-shadow:
+    0 0 8px #b391ff66,
+    inset 0 0 8px #8bbaff33;
+  opacity: 0;
+  transform: scale(1.32, 1.65);
+  pointer-events: none;
+  transition:
+    transform 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 520ms ease-out;
+}
+
+.donation-button:active .donation-button__pulse {
+  opacity: 0.9;
+  transform: scale(1);
+  transition: none;
+}
+
+@keyframes donation-orbit {
+  to {
+    --donation-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .donation-control {
+    animation: none;
+  }
+
+  .donation-button,
+  .donation-control::before,
+  .donation-button__pulse {
+    transition: none;
+  }
+
+  .donation-button:active {
+    transform: none;
+  }
+
+  .donation-button:active .donation-button__pulse {
+    transform: none;
+  }
+}

@@ -80,6 +80,7 @@ import {
   SERIES_COLOR_PRESETS,
 } from '@/lib/series-colors';
 import { useSlots } from '@/hooks/use-slots';
+import { DonationButton } from '@/components/donation-button';
 export default function Home() {
   const extension = useHltvExtension();
   const manual = useManualDraft();
@@ -521,14 +522,17 @@ export default function Home() {
           <span className="top-note">
             <Radio size={14} /> LIVE DATA WORKBENCH
           </span>
-          <a
-            className="quiet-link"
-            href="https://www.hltv.org/stats"
-            target="_blank"
-            rel="noreferrer"
-          >
-            HLTV <ArrowUpRight size={16} />
-          </a>
+          <div className="topbar-actions">
+            <a
+              className="quiet-link"
+              href="https://www.hltv.org/stats"
+              target="_blank"
+              rel="noreferrer"
+            >
+              HLTV <ArrowUpRight size={16} />
+            </a>
+            <DonationButton />
+          </div>
         </header>
         <section className="workspace-heading">
           <div>

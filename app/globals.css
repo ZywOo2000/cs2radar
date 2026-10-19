@@ -153,6 +153,25 @@ svg {
 .quiet-link:hover {
   color: #fff;
 }
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-left: auto;
+}
+.topbar-actions .quiet-link {
+  margin-left: 0;
+}
+@media (max-width: 760px) {
+  .topbar-actions {
+    gap: 14px;
+  }
+}
+@media (max-width: 380px) {
+  .topbar-actions .quiet-link {
+    display: none;
+  }
+}
 .workspace-heading {
   display: flex;
   align-items: center;
