@@ -208,13 +208,15 @@ export default function Home() {
           performance.find((m) => m.key === 'swing')!,
         ]
       : attributes;
-  const comparable = sharedMetrics(
-    ms,
-    sa,
-    comp && pb ? sb : undefined,
-    pa?.ratingVersion,
-    pb?.ratingVersion,
-  );
+  const comparable = isManual
+    ? manualComparison.comparable
+    : sharedMetrics(
+        ms,
+        sa,
+        comp && pb ? sb : undefined,
+        pa?.ratingVersion,
+        pb?.ratingVersion,
+      );
   const videoPeople = useMemo<SequenceParticipant[]>(
     () =>
       slots.flatMap((slot, i) => {
@@ -282,11 +284,14 @@ export default function Home() {
   const visibleTableMetrics = showAllStats
     ? tableMetrics
     : tableMetrics.filter((metric) => keyMetricKeys.has(metric.key));
-  const ratingMismatch =
+  const ratingVersionMismatch =
     comp &&
     pa &&
     pb &&
     (pa.ratingVersion !== pb.ratingVersion || pa.ratingVersion === '未标注');
+  const ratingMismatch = ratingVersionMismatch && !isManual;
+  const manualRatingVersionNotice = isManual && ratingVersionMismatch &&
+    Number.isFinite(sa.rating) && Number.isFinite(sb.rating);
   async function download() {
     if (!ready || busy || exporting || exportingVideo) return;
     setExporting(true);
@@ -1111,6 +1116,12 @@ export default function Home() {
               两份 Rating 版本不同或未标注，已从雷达图排除
               Rating；下方保留原始评分。
             </span>
+          </div>
+        )}
+        {manualRatingVersionNotice && (
+          <div className="notice">
+            <TriangleAlert size={16} />
+            <span>Rating 按手动填写值比较；两侧版本未统一或未标注。</span>
           </div>
         )}
         <section

@@ -1,5 +1,5 @@
 import { emptyManual, MANUAL_COLORS, parseManual, restoreManual, type ManualDraft } from './manual-data';
-import { broadcastMetrics, sharedMetrics } from './stats';
+import { broadcastMetrics } from './stats';
 
 export const MANUAL_WORKSPACE_KEY = 'cs2-radar-manual-v2';
 export type ManualSide = 'A' | 'B';
@@ -37,8 +37,11 @@ export function restoreManualWorkspace(raw: string | null, legacy: string | null
 export function manualComparisonState(workspace: ManualWorkspace) {
   const a = parseManual(workspace.drafts.A), b = parseManual(workspace.drafts.B);
   const compare = workspace.mode === 'compare';
-  const comparable = sharedMetrics(broadcastMetrics, a.stats, compare ? b.stats : undefined,
-    workspace.drafts.A.ratingVersion, workspace.drafts.B.ratingVersion);
+  // Manually entered ratings are compared as supplied, regardless of the
+  // selected version label. The label is informational for this unverified data.
+  const comparable = broadcastMetrics.filter(metric =>
+    Number.isFinite(a.stats[metric.key]) &&
+    (!compare || Number.isFinite(b.stats[metric.key])));
   const invalidSides = (['A', ...(compare ? ['B'] : [])] as ManualSide[])
     .filter(side => Object.keys((side === 'A' ? a : b).errors).length > 0);
   const ready = invalidSides.length === 0 && comparable.length >= 3;

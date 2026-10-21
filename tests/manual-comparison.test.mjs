@@ -101,16 +101,23 @@ test('comparison requires three shared radar metrics and valid input on both sid
   w.mode = 'single'; assert.equal(manualComparisonState(w).ready, true);
 });
 
-test('Rating versions must be known and equal, while raw ratings remain intact', () => {
+test('manual ratings are compared as entered even when versions are unknown or different', () => {
   const w = emptyManualWorkspace(); w.mode = 'compare';
   for (const side of ['A', 'B']) Object.assign(w.drafts[side].values, { kpr: '.9', adr: '98', rating: '1.3' });
-  assert.equal(manualComparisonState(w).ready, false);
+  let state = manualComparisonState(w);
+  assert.equal(state.ready, true);
+  assert.ok(state.comparable.some(m => m.key === 'rating'));
   for (const side of ['A', 'B']) w.drafts[side].ratingVersion = '3.0';
   assert.equal(manualComparisonState(w).ready, true);
   w.drafts.B.ratingVersion = '2.1';
-  const state = manualComparisonState(w);
-  assert.equal(state.ready, false); assert.equal(state.a.stats.rating, 1.3); assert.equal(state.b.stats.rating, 1.3);
+  state = manualComparisonState(w);
+  assert.equal(state.ready, true); assert.equal(state.a.stats.rating, 1.3); assert.equal(state.b.stats.rating, 1.3);
+  assert.ok(state.comparable.some(m => m.key === 'rating'));
+  w.drafts.B.values.rating = '';
+  state = manualComparisonState(w);
+  assert.equal(state.ready, false);
   assert.ok(!state.comparable.some(m => m.key === 'rating'));
+  assert.equal(state.b.stats.rating, undefined);
 });
 
 test('side adapters have distinct identity and names without profile links or invented numbers', () => {
