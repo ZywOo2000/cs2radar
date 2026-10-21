@@ -53,12 +53,13 @@ export function restoreManual(raw: string | null): ManualDraft {
   if (Array.isArray(saved.bestKeys)) draft.bestKeys = MANUAL_FIELDS.filter(f => saved.bestKeys.includes(f.key)).map(f => f.key);
   return draft;
 }
-export function manualDataset(draft: ManualDraft): Dataset {
+export function manualDataset(draft: ManualDraft, side?: 'A' | 'B', compare = false): Dataset {
+  const id = side ? `manual-${side}` : 'manual';
   return {
-    id: 'manual', kind: 'player', title: MANUAL_LABEL, event: '', date: '', sourceUrl: '', importedAt: '',
+    id, kind: 'player', title: MANUAL_LABEL, event: '', date: '', sourceUrl: '', importedAt: '',
     scopes: [{ id: 'manual', name: [draft.team.trim(), draft.scope.trim()].filter(Boolean).join(' · ') }],
     notes: [MANUAL_LABEL],
-    players: [{ id: 'manual', name: draft.name.trim() || '自定义选手', team: draft.team.trim(),
+    players: [{ id, name: draft.name.trim() || (compare && side ? `自定义选手 ${side}` : '自定义选手'), team: draft.team.trim(),
       ratingVersion: draft.ratingVersion, detailLoaded: true, stats: { manual: parseManual(draft).stats } }],
   };
 }

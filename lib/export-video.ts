@@ -13,7 +13,7 @@ import {
   videoFileName,
   videoFrameGeometry,
 } from './export-video-utils';
-import { applyRadarViewBox } from './radar-bounds';
+import { applyRadarViewBox, copyRadarTextBounds } from './radar-bounds';
 import { freezeVideoFrame, holdFinalVideoFrame } from './video-final-hold';
 
 export type ExportSide = { name: string; context: string };
@@ -127,6 +127,7 @@ export async function exportDynamicVideo(
     );
 
   const clone = live.cloneNode(true) as SVGSVGElement;
+  copyRadarTextBounds(live, clone);
   clone.querySelectorAll<SVGAnimateElement>('animate').forEach((animation) => {
     const attribute = animation.getAttribute('attributeName'),
       target = animation.getAttribute('to');

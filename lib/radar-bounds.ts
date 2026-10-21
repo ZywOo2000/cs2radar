@@ -2,6 +2,19 @@ export type RadarViewBox={x:number;y:number;width:number;height:number};
 
 const numbers=(value:string|null)=>value?.trim().split(/[\s,]+/).map(Number).filter(Number.isFinite)||[];
 
+// Detached SVG clones cannot measure font geometry. Retain the live text bounds
+// before serialization so enlarged values and Best labels fit the export area.
+export function copyRadarTextBounds(source:Element,target:Element){
+ const originals=source.querySelectorAll('text');
+ target.querySelectorAll('text').forEach((node,index)=>{
+  const original=originals[index] as SVGGraphicsElement|undefined;
+  if(typeof original?.getBBox!=='function')return;
+  const box=original.getBBox();
+  if([box.x,box.y,box.width,box.height].every(Number.isFinite))
+   node.setAttribute('data-radar-text-bounds',`${box.x} ${box.y} ${box.width} ${box.height}`);
+ });
+}
+
 export function radarEffectPadding(svg:Element){
  let stroke=0,radius=0,blur=0,shadow=0;
  svg.querySelectorAll('[data-series="A"] *,[data-series="B"] *,[data-swing] rect').forEach(node=>{
@@ -36,6 +49,10 @@ export function radarViewBox(svg:Element,padding=radarEffectPadding(svg)):RadarV
  svg.querySelectorAll('[data-swing] rect').forEach(node=>{
   const x=Number(node.getAttribute('x')),y=Number(node.getAttribute('y')),width=Number(node.getAttribute('width')),height=Number(node.getAttribute('height'));
   include(x,y);include(x+width,y+height);
+ });
+ svg.querySelectorAll('text[data-radar-text-bounds]').forEach(node=>{
+  const box=numbers(node.getAttribute('data-radar-text-bounds'));
+  if(box.length===4){include(box[0],box[1]);include(box[0]+box[2],box[1]+box[3])}
  });
 
  return {x:minX,y:minY,width:maxX-minX,height:maxY-minY};

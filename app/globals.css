@@ -598,6 +598,9 @@ svg {
   }
 }
 .manual-editor { padding: 20px; display: grid; gap: 16px; }
+.manual-mode-controls { display: flex; min-width: 0; margin: 0; gap: 6px; padding: 14px 20px; border: 0; border-bottom: 1px solid var(--border); }
+.manual-mode-controls button { flex: 1; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 5px; background: var(--background); color: var(--muted-foreground); font-size: 14px; }
+.manual-mode-controls button[aria-pressed='true'] { border-color: var(--primary); background: var(--secondary); color: var(--foreground); }
 .manual-provenance { color: #ffd166; font-size: 14px; line-height: 1.6; margin: 12px 20px; }
 .manual-editor .manual-provenance { margin: 0; }
 .manual-fields { border: 0; padding: 0; min-width: 0; display: grid; gap: 16px; }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {applyRadarViewBox,radarEffectPadding,radarViewBox} from '../lib/radar-bounds.ts';
+import {applyRadarViewBox,copyRadarTextBounds,radarEffectPadding,radarViewBox} from '../lib/radar-bounds.ts';
 
 const element=attributes=>({getAttribute:name=>attributes[name]??null});
 const series={querySelectorAll(selector){
@@ -37,4 +37,14 @@ test('export bounds include positive and negative swing overflow',()=>{
  const left=element({x:'-300',y:'780',width:'400',height:'20'}),right=element({x:'500',y:'840',width:'800',height:'20'});
  const svg={getAttribute:name=>name==='viewBox'?'0 0 1000 960':null,querySelectorAll(selector){if(selector==='[data-swing] rect')return [left,right];if(selector.includes('[data-swing] rect'))return [left,right];return []}};
  assert.deepEqual(radarViewBox(svg),{x:-302,y:0,width:1604,height:960});
+});
+
+test('export bounds retain measured Best text beyond the SVG edge',()=>{
+ const attributes={};
+ const text={getAttribute:key=>attributes[key]??null,setAttribute:(key,value)=>attributes[key]=value};
+ const source={querySelectorAll:()=>[{getBBox:()=>({x:970,y:40,width:150,height:52})}]};
+ const target={getAttribute:()=> '0 0 1000 960',querySelectorAll:selector=>selector==='text'||selector==='text[data-radar-text-bounds]'?[text]:[]};
+ copyRadarTextBounds(source,target);
+ assert.equal(attributes['data-radar-text-bounds'],'970 40 150 52');
+ assert.deepEqual(radarViewBox(target,20),{x:0,y:0,width:1140,height:960});
 });

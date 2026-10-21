@@ -61,7 +61,8 @@ test('complete dual comparison retains values and separate positive/negative swi
  assert.doesNotMatch($('[data-metric-value="rating"]').text(),/圆心|外圈/);
  assert.match($('[data-firepower]').text(),/A 91.*B 84/);
  assert.equal($('[data-firepower] text').last().text(),'火力值');
- assert.equal($('[data-firepower] text').first().attr('y'),'738');
+ assert.equal($('[data-firepower] text').first().attr('y'),'708');
+ assert.equal($('[data-firepower] g text').first().attr('y'),'738');
  assert.equal($('[data-swing="A"] line').first().attr('y1'),'802');
  assert.equal($('[data-swing="B"] line').first().attr('y1'),'862');
  assert.equal($('[data-swing="A"] rect').attr('fill'),'#22d559');assert.equal($('[data-swing="B"] rect').attr('fill'),'#f06469');

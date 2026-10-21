@@ -67,6 +67,7 @@ import { ExtensionGuide } from '@/components/extension-guide';
 import { ManualEditor } from '@/components/manual-editor';
 import { useManualDraft } from '@/hooks/use-manual-draft';
 import { manualDataset, parseManual, MANUAL_LABEL } from '@/lib/manual-data';
+import { manualComparisonState, type ManualSide } from '@/lib/manual-comparison';
 import { SourcePanel, ColorEditor, Picker } from '@/components/source-panel';
 import {
   emptySlot as empty,
@@ -84,8 +85,14 @@ import { DonationButton } from '@/components/donation-button';
 export default function Home() {
   const extension = useHltvExtension();
   const manual = useManualDraft();
-  const manualResult = useMemo(() => parseManual(manual.draft), [manual.draft]);
-  const manualData = useMemo(() => manualDataset(manual.draft), [manual.draft]);
+  const [activeManualSide, setActiveManualSide] = useState<ManualSide>('A');
+  const manualCompare = manual.workspace.mode === 'compare';
+  const editingManualSide = manualCompare ? activeManualSide : 'A';
+  const manualDraft = manual.workspace.drafts[editingManualSide];
+  const manualResult = useMemo(() => parseManual(manualDraft), [manualDraft]);
+  const manualComparison = useMemo(() => manualComparisonState(manual.workspace), [manual.workspace]);
+  const manualDataA = useMemo(() => manualDataset(manual.workspace.drafts.A, 'A', manualCompare), [manual.workspace.drafts.A, manualCompare]);
+  const manualDataB = useMemo(() => manualDataset(manual.workspace.drafts.B, 'B', manualCompare), [manual.workspace.drafts.B, manualCompare]);
   const [transport, setTransport] = useState<Transport>('auto');
   const videoExportLock = useRef(false);
   const sequenceRef = useRef<SequenceRadarHandle>(null);
@@ -171,22 +178,27 @@ export default function Home() {
       return copy;
     });
   }
-  const manualSlot: Slot = {
+  const manualSlotA: Slot = {
     ...empty(),
-    data: manualData,
-    playerId: 'manual',
+    data: manualDataA,
+    playerId: 'manual-A',
     scopeId: 'manual',
-    bestKeys: manual.draft.bestKeys,
+    bestKeys: manual.workspace.drafts.A.bestKeys,
   };
-  const a = isManual ? manualSlot : slots[0],
-    b = slots[1],
+  const manualSlotB: Slot = {
+    ...empty(), data: manualDataB, playerId: 'manual-B', scopeId: 'manual',
+    bestKeys: manual.workspace.drafts.B.bestKeys,
+  };
+  const a = isManual ? manualSlotA : slots[0],
+    b = isManual ? manualSlotB : slots[1],
     pa = player(a),
     pb = player(b),
     sa = stats(a),
     sb = stats(b),
-    comp = mode === 'compare',
+    comp = mode === 'compare' || (isManual && manualCompare),
     isVideo = mode === 'video';
   const primaryColor = isManual ? manual.draft.color : seriesColors[0];
+  const secondaryColor = isManual ? manual.workspace.drafts.B.color : seriesColors[1];
   const ms = view === 'performance' ? broadcastMetrics : attributes;
   const bestOptions =
     view === 'performance'
@@ -229,7 +241,7 @@ export default function Home() {
   const sequenceReady =
     videoPeople.length >= 2 && sequenceComparable.length >= 3;
   const ready = isManual
-    ? manual.loaded && manualResult.ready
+    ? manual.loaded && manualComparison.ready
     : isVideo
       ? sequenceReady
       : comparable.length >= 3;
@@ -293,6 +305,7 @@ export default function Home() {
             ? MANUAL_LABEL
             : pa.profileUrl || a.data?.sourceUrl || '',
           manual: isManual,
+          color: primaryColor,
           version: pa.ratingVersion,
           stats: sa,
           demo: !!a.data?.demo,
@@ -301,7 +314,9 @@ export default function Home() {
           ? {
               name: pb.name,
               context: context(b),
-              source: pb.profileUrl || b.data?.sourceUrl || '',
+              source: isManual ? MANUAL_LABEL : pb.profileUrl || b.data?.sourceUrl || '',
+              manual: isManual,
+              color: secondaryColor,
               version: pb.ratingVersion,
               stats: sb,
               demo: !!b.data?.demo,
@@ -356,11 +371,11 @@ export default function Home() {
     }
   }
   const actions = useRef({ load, choose });
-  const manualRef = useRef(manual.draft);
+  const manualRef = useRef(manual.workspace);
   const configRef = useRef({ mode, view });
   useEffect(() => {
     actions.current = { load, choose };
-    manualRef.current = manual.draft;
+    manualRef.current = manual.workspace;
     configRef.current = { mode, view };
   });
   useEffect(() => {
@@ -402,9 +417,16 @@ export default function Home() {
       mode: configRef.current.mode,
       view: configRef.current.view,
       manual: {
-        ...manualRef.current,
-        ...parseManual(manualRef.current),
+        ...manualRef.current.drafts.A,
+        ...parseManual(manualRef.current.drafts.A),
         source: MANUAL_LABEL,
+      },
+      manualComparison: {
+        mode: manualRef.current.mode,
+        A: { ...manualRef.current.drafts.A, ...parseManual(manualRef.current.drafts.A) },
+        B: { ...manualRef.current.drafts.B, ...parseManual(manualRef.current.drafts.B) },
+        ready: manualComparisonState(manualRef.current).ready,
+        comparableMetrics: manualComparisonState(manualRef.current).comparable.map(m => m.key),
       },
       slots: store.getSnapshot().map((s, i) => ({
         slot: 'ABCDE'[i],
@@ -542,7 +564,7 @@ export default function Home() {
             </h1>
             <p>
               {isManual
-                ? '手动填写比赛表现，实时生成雷达图并导出。'
+                ? manualCompare ? '手动填写两位选手，叠加对比比赛表现并导出。' : '手动填写比赛表现，实时生成雷达图并导出。'
                 : isVideo
                   ? '按顺序将 2–5 位选手的数据连续变形并导出视频。'
                   : comp
@@ -652,13 +674,13 @@ export default function Home() {
             </TabsList>
           </Tabs>
           <div className="toolbar-right">
-            <span className="muted small">跨比赛 · 跨赛事 · 同一选手</span>
+            <span className="muted small">{isManual ? '独立手动草稿 · 自动保存' : '跨比赛 · 跨赛事 · 同一选手'}</span>
             {comp && (
               <button
                 className="icon-button"
                 aria-label="交换两份数据"
-                disabled={busy || (!a.data && !b.data)}
-                onClick={() => moveSlot(0, 1)}
+                disabled={busy || exporting || exportingVideo || (isManual && !manual.loaded) || (!a.data && !b.data)}
+                onClick={() => isManual ? manual.swap() : moveSlot(0, 1)}
               >
                 <ArrowLeftRight size={17} />
               </button>
@@ -860,6 +882,16 @@ export default function Home() {
                   </div>
                   <SlidersHorizontal size={18} />
                 </div>
+                {isManual && (
+                  <fieldset className="manual-mode-controls" aria-label="手动展示模式">
+                    <button type="button" aria-pressed={!manualCompare}
+                      disabled={!manual.loaded || exporting || exportingVideo}
+                      onClick={() => manual.setMode('single')}>单人展示</button>
+                    <button type="button" aria-pressed={manualCompare}
+                      disabled={!manual.loaded || exporting || exportingVideo}
+                      onClick={() => manual.setMode('compare')}>双人对比</button>
+                  </fieldset>
+                )}
                 {comp && (
                   <div
                     className="slot-switch"
@@ -867,17 +899,20 @@ export default function Home() {
                     aria-label="选择编辑的数据"
                   >
                     {[0, 1].map((i) => {
-                      const selectedPlayer = player(slots[i]);
+                      const side = i === 0 ? 'A' : 'B';
+                      const selectedPlayer = player(isManual ? (i === 0 ? a : b) : slots[i]);
+                      const selected = isManual ? editingManualSide === side : activeSlot === i;
                       return (
                         <button
                           key={i}
                           type="button"
                           role="tab"
-                          aria-selected={activeSlot === i}
-                          data-active={activeSlot === i || undefined}
-                          onClick={() => setActiveSlot(i)}
+                          aria-selected={selected}
+                          data-active={selected || undefined}
+                          disabled={exporting || exportingVideo || (isManual && !manual.loaded)}
+                          onClick={() => isManual ? setActiveManualSide(side) : setActiveSlot(i)}
                         >
-                          <span style={{ background: seriesColors[i] }}>
+                          <span style={{ background: i === 0 ? primaryColor : secondaryColor }}>
                             {i === 0 ? 'A' : 'B'}
                           </span>
                           <b>
@@ -891,18 +926,21 @@ export default function Home() {
                 )}
                 {isManual ? (
                   <ManualEditor
-                    draft={manual.draft}
-                    onChange={manual.setDraft}
+                    draft={manualDraft}
+                    onChange={(draft) => manual.setSideDraft(editingManualSide, draft)}
+                    side={editingManualSide}
+                    compare={manualCompare}
+                    onClear={() => manual.clearSide(editingManualSide)}
                     errors={manualResult.errors}
                     count={manualResult.count}
                     storageMessage={manual.storageMessage}
                     disabled={!manual.loaded || exporting || exportingVideo}
                     colors={
                       <ColorEditor
-                        side="a"
-                        color={primaryColor}
+                        side={editingManualSide === 'A' ? 'a' : 'b'}
+                        color={manualDraft.color}
                         onChange={(color) =>
-                          manual.setDraft((d) => ({ ...d, color }))
+                          manual.setSideDraft(editingManualSide, (d) => ({ ...d, color }))
                         }
                       />
                     }
@@ -984,9 +1022,10 @@ export default function Home() {
                     bestA={a.bestKeys}
                     bestB={b.bestKeys}
                     colorA={primaryColor}
-                    colorB={seriesColors[1]}
+                    colorB={secondaryColor}
                     dataKey={[
                       mode,
+                      isManual ? manual.workspace.mode : '',
                       view,
                       a.data?.importedAt,
                       a.playerId,
@@ -1008,9 +1047,7 @@ export default function Home() {
                 </div>
                 {isManual && !ready && (
                   <output className="manual-provenance">
-                    {Object.keys(manualResult.errors).length
-                      ? '请修正左侧无效数值后再导出。'
-                      : '至少填写三项雷达指标后即可导出。'}
+                    {manualComparison.message}
                   </output>
                 )}
                 <div className="chart-caption">
@@ -1022,10 +1059,10 @@ export default function Home() {
                     A · {pa?.name || '等待选择'}
                   </span>
                   {comp && (
-                    <span style={{ color: seriesColors[1] }}>
+                    <span style={{ color: secondaryColor }}>
                       <i
                         className="legend-dot"
-                        style={{ background: seriesColors[1] }}
+                        style={{ background: secondaryColor }}
                       />
                       B · {pb?.name || '等待选择'}
                     </span>
@@ -1123,7 +1160,7 @@ export default function Home() {
                   {comp && (
                     <TableHead
                       className="text-b"
-                      style={{ color: seriesColors[1] }}
+                      style={{ color: secondaryColor }}
                     >
                       B · {pb?.name || '未选择'}
                       <small>
@@ -1171,7 +1208,7 @@ export default function Home() {
                       {comp && (
                         <TableCell
                           className="numeric text-b"
-                          style={{ color: seriesColors[1] }}
+                          style={{ color: secondaryColor }}
                         >
                           {format(bv, m)}
                         </TableCell>
