@@ -5,6 +5,13 @@ export type RadarMotionState={mode:RadarDisplayMode;kind:RadarMotionKind;runId:n
 export const RADAR_RING_PAUSE_MS=300;
 export const RADAR_RING_EXPAND_MS=1100;
 
+// Source identity stays constant while manual fields are edited. Include the
+// geometry and comparable axes so new SVG segments always receive a fresh run.
+export const radarMotionDataKey=(sourceKey:string|undefined,metrics:readonly {key:string}[],a:Readonly<Record<string,number|undefined>>,b?:Readonly<Record<string,number|undefined>>,drawKeys?:readonly string[])=>JSON.stringify([
+ sourceKey||'',metrics.map(m=>[m.key,a[m.key],b?.[m.key]]),!!b,drawKeys??null,
+ a.swing,b?.swing,a.firepower,b?.firepower,
+]);
+
 export const initialRadarMotion:RadarMotionState={mode:'static',kind:'center',runId:0};
 
 export const pickRadarMotion=(random:()=>number=Math.random):RadarMotionKind=>random()<.5?'rings':'center';
