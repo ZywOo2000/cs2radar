@@ -6,14 +6,14 @@ import {type Metric,type Stats,normalized,format} from '@/lib/stats';
 import {BroadcastRadar} from './broadcast-radar';
 import {RadarModeControls,useRadarMotion,useRadarRingPlayback} from './radar-motion-controls';
 import {radarMotionDataKey} from '@/lib/radar-motion';
-export function Radar({metrics,a,b,nameA,nameB,drawKeys,bestA:requestedBestA=[],bestB:requestedBestB=[],dataKey,colorA='#bddbff',colorB='#61dac8',showControls=true,bestOpacity=1}:{metrics:Metric[];a:Stats;b?:Stats;nameA:string;nameB?:string;drawKeys?:string[];bestA?:string[];bestB?:string[];dataKey?:string;colorA?:string;colorB?:string;showControls?:boolean;bestOpacity?:number}){
+export function Radar({metrics,a,b,nameA,nameB,drawKeys,bestA:requestedBestA=[],bestB:requestedBestB=[],dataKey,colorA='#bddbff',colorB='#61dac8',showControls=true,bestOpacity=1,hideMissingExtras=false}:{metrics:Metric[];a:Stats;b?:Stats;nameA:string;nameB?:string;drawKeys?:string[];bestA?:string[];bestB?:string[];dataKey?:string;colorA?:string;colorB?:string;showControls?:boolean;bestOpacity?:number;hideMissingExtras?:boolean}){
  const bestA=requestedBestA.filter(key=>Number.isFinite(a[key]));
  const bestB=requestedBestB.filter(key=>Number.isFinite(b?.[key]));
  const [hover,setHover]=useState<number|null>(null);const n=metrics.length;
  const motion=useRadarMotion(radarMotionDataKey(dataKey,metrics,a,b,drawKeys));
  const svgRef=useRadarRingPlayback(motion.mode,motion.kind,motion.runId);
  const bestMotionClass=motion.mode==='dynamic'?`radar-best-motion radar-best-${motion.kind}`:undefined;
- if(metrics.some(m=>m.key==='multiKillPct'))return <BroadcastRadar metrics={metrics} a={a} b={b} nameA={nameA} nameB={nameB} drawKeys={drawKeys} bestA={bestA} bestB={bestB} dataKey={dataKey} colorA={colorA} colorB={colorB} showControls={showControls} bestOpacity={bestOpacity}/>;
+ if(metrics.some(m=>m.key==='multiKillPct'))return <BroadcastRadar metrics={metrics} a={a} b={b} nameA={nameA} nameB={nameB} drawKeys={drawKeys} bestA={bestA} bestB={bestB} dataKey={dataKey} colorA={colorA} colorB={colorB} showControls={showControls} bestOpacity={bestOpacity} hideMissingExtras={hideMissingExtras}/>;
  // The reference grid never changes size. Values above 100 keep their real
  // normalized radius and may extend beyond both the grid and SVG viewport.
  const referenceRadius=150;

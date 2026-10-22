@@ -301,7 +301,9 @@ export default function Home() {
       await exportChart(
         view === 'performance' ? '选手比赛表现' : 'HLTV 选手属性',
         view === 'performance'
-          ? [...ms, performance.find((m) => m.key === 'swing')!]
+          ? [...ms, performance.find((m) => m.key === 'swing')!].filter(m =>
+              !isManual || m.key !== 'swing' || Number.isFinite(sa.swing) ||
+              (comp && pb && Number.isFinite(sb.swing)))
           : comparable,
         {
           name: pa.name,
@@ -1024,6 +1026,7 @@ export default function Home() {
                     nameA={pa?.name || '数据 A'}
                     nameB={pb?.name || '数据 B'}
                     drawKeys={comparable.map((m) => m.key)}
+                    hideMissingExtras={isManual}
                     bestA={a.bestKeys}
                     bestB={b.bestKeys}
                     colorA={primaryColor}
