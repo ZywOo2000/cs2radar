@@ -40,8 +40,9 @@ export const SequenceRadar = forwardRef<
     people: SequenceParticipant[];
     metrics: Metric[];
     onPlaying?: (value: boolean) => void;
+    hideMissingExtras?: boolean;
   }
->(function SequenceRadar({ people, metrics, onPlaying }, ref) {
+>(function SequenceRadar({ people, metrics, onPlaying, hideMissingExtras = false }, ref) {
   const timelineMetrics = useMemo(() => {
     const extras = metrics.some((m) => m.key === 'multiKillPct')
       ? performanceMetrics.filter(
@@ -208,6 +209,7 @@ export const SequenceRadar = forwardRef<
           colorA={frame.color}
           dataKey="sequence-controlled-static"
           showControls={false}
+          hideMissingExtras={hideMissingExtras}
           bestOpacity={frame.bestOpacity}
         />
       </div>

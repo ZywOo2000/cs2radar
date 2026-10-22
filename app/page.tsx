@@ -82,6 +82,9 @@ import {
 } from '@/lib/series-colors';
 import { useSlots } from '@/hooks/use-slots';
 import { DonationButton } from '@/components/donation-button';
+import { LocalArenaImport } from '@/components/local-arena-import';
+import { arenaDataset } from '@/lib/local-arena';
+import { ARENA_LABEL, type ArenaPacket } from '@/lib/local-arena-protocol';
 export default function Home() {
   const extension = useHltvExtension();
   const manual = useManualDraft();
@@ -93,6 +96,7 @@ export default function Home() {
   const manualComparison = useMemo(() => manualComparisonState(manual.workspace), [manual.workspace]);
   const manualDataA = useMemo(() => manualDataset(manual.workspace.drafts.A, 'A', manualCompare), [manual.workspace.drafts.A, manualCompare]);
   const manualDataB = useMemo(() => manualDataset(manual.workspace.drafts.B, 'B', manualCompare), [manual.workspace.drafts.B, manualCompare]);
+  const [localDataset, setLocalDataset] = useState<Dataset | null>(null);
   const [transport, setTransport] = useState<Transport>('auto');
   const videoExportLock = useRef(false);
   const sequenceRef = useRef<SequenceRadarHandle>(null);
@@ -111,7 +115,10 @@ export default function Home() {
     [videoProgress, setVideoProgress] = useState(0),
     [notice, setNotice] = useState('');
   const isManual = mode === 'manual';
-  const view = isManual ? 'performance' : importView;
+  const arenaActive = !isManual && (mode === 'video'
+    ? slots.some(slot => slot.data?.origin?.type === 'local-arena')
+    : slots[0].data?.origin?.type === 'local-arena' || (mode === 'compare' && slots[1].data?.origin?.type === 'local-arena'));
+  const view = isManual || arenaActive ? 'performance' : importView;
   async function fetchData(
     url: string,
     via: Transport,
@@ -292,6 +299,35 @@ export default function Home() {
   const ratingMismatch = ratingVersionMismatch && !isManual;
   const manualRatingVersionNotice = isManual && ratingVersionMismatch &&
     Number.isFinite(sa.rating) && Number.isFinite(sb.rating);
+  function arenaPlayerId(data: Dataset) {
+    return data.players.find(p => p.id === data.origin?.preferredPlayerId)?.id ||
+      data.players.find(p => !p.isBot)?.id || data.players[0].id;
+  }
+  function setArenaSlot(index: number, data: Dataset, id: string) {
+    store.reset(index, { ...empty(), data, playerId: id, scopeId: 'all' });
+  }
+  function importArena(packet: ArenaPacket) {
+    if (exporting || exportingVideo || videoExportLock.current || busy || sequencePlaying)
+      throw Error('正在读取或导出，请结束后再导入本地对局。');
+    const data = arenaDataset(packet);
+    setArenaSlot(0, data, arenaPlayerId(data));
+    setLocalDataset(data); setMode('single'); setView('performance'); setActiveSlot(0);
+    setNotice('Local Arena 全员数据已导入。Rating 为离线模型，非 HLTV 官方评分。');
+  }
+  function compareArena(id: string) {
+    if (!localDataset || exporting || exportingVideo || busy || sequencePlaying) return;
+    const ownId = slots[0].data?.id === localDataset.id ? slots[0].playerId : arenaPlayerId(localDataset);
+    if (!localDataset.players.some(p => p.id === id) || id === ownId) return;
+    setArenaSlot(0, localDataset, ownId); setArenaSlot(1, localDataset, id);
+    setMode('compare'); setView('performance'); setActiveSlot(0);
+  }
+  function videoArena(ids: string[]) {
+    if (!localDataset || exporting || exportingVideo || busy || sequencePlaying) return;
+    if (ids.length < 2 || ids.length > 5 || new Set(ids).size !== ids.length || ids.some(id => !localDataset.players.some(p => p.id === id))) return;
+    ids.forEach((id, index) => setArenaSlot(index, localDataset, id));
+    for (let index = ids.length; index < 5; index++) store.reset(index);
+    setMode('video'); setView('performance'); setActiveSlot(0);
+  }
   async function download() {
     if (!ready || busy || exporting || exportingVideo) return;
     setExporting(true);
@@ -302,7 +338,7 @@ export default function Home() {
         view === 'performance' ? '选手比赛表现' : 'HLTV 选手属性',
         view === 'performance'
           ? [...ms, performance.find((m) => m.key === 'swing')!].filter(m =>
-              !isManual || m.key !== 'swing' || Number.isFinite(sa.swing) ||
+              (!isManual && !arenaActive) || m.key !== 'swing' || Number.isFinite(sa.swing) ||
               (comp && pb && Number.isFinite(sb.swing)))
           : comparable,
         {
@@ -310,8 +346,9 @@ export default function Home() {
           context: context(a),
           source: isManual
             ? MANUAL_LABEL
-            : pa.profileUrl || a.data?.sourceUrl || '',
+            : a.data?.origin?.type === 'local-arena' ? ARENA_LABEL : pa.profileUrl || a.data?.sourceUrl || '',
           manual: isManual,
+          provenance: a.data?.origin?.type,
           color: primaryColor,
           version: pa.ratingVersion,
           stats: sa,
@@ -321,8 +358,9 @@ export default function Home() {
           ? {
               name: pb.name,
               context: context(b),
-              source: isManual ? MANUAL_LABEL : pb.profileUrl || b.data?.sourceUrl || '',
+              source: isManual ? MANUAL_LABEL : b.data?.origin?.type === 'local-arena' ? ARENA_LABEL : pb.profileUrl || b.data?.sourceUrl || '',
               manual: isManual,
+              provenance: b.data?.origin?.type,
               color: secondaryColor,
               version: pb.ratingVersion,
               stats: sb,
@@ -438,6 +476,7 @@ export default function Home() {
       slots: store.getSnapshot().map((s, i) => ({
         slot: 'ABCDE'[i],
         source: s.data?.sourceUrl || null,
+        origin: s.data?.origin || null,
         player: player(s)?.name || null,
         playerId: s.playerId,
         scopeId: s.scopeId,
@@ -626,7 +665,7 @@ export default function Home() {
             </div>
           </div>
         </section>
-        {!isManual && (
+        {!isManual && !arenaActive && (
           <div className="extension-bar">
             <div>
               <Database size={18} />
@@ -694,6 +733,10 @@ export default function Home() {
             )}
           </div>
         </div>
+        <LocalArenaImport dataset={localDataset}
+          currentPlayerId={localDataset && slots[0].data?.id === localDataset.id ? slots[0].playerId : localDataset ? arenaPlayerId(localDataset) : ''}
+          disabled={busy || exporting || exportingVideo || sequencePlaying}
+          onImport={importArena} onCompare={compareArena} onVideo={videoArena} />
         {notice && (
           <output className="notice">
             <Info size={15} />
@@ -813,7 +856,7 @@ export default function Home() {
                     : sequenceComparable.length + ' 项共同指标'}
                 </span>
               </div>
-              <Tabs
+              {!arenaActive && <Tabs
                 value={view}
                 onValueChange={(v) => setView(String(v))}
                 className="chart-tabs"
@@ -822,7 +865,7 @@ export default function Home() {
                   <TabsTrigger value="performance">比赛指标</TabsTrigger>
                   <TabsTrigger value="attributes">HLTV 属性</TabsTrigger>
                 </TabsList>
-              </Tabs>
+              </Tabs>}
               <div className="sequence-preview-actions">
                 <button
                   className="button secondary"
@@ -851,6 +894,7 @@ export default function Home() {
                     ].join('|')}
                     ref={sequenceRef}
                     people={videoPeople}
+                    hideMissingExtras={!!arenaActive}
                     metrics={view === 'performance' ? ms : sequenceComparable}
                     onPlaying={setSequencePlaying}
                   />
@@ -1003,7 +1047,7 @@ export default function Home() {
                           : '等待数据'}
                   </span>
                 </div>
-                {!isManual && (
+                {!isManual && !arenaActive && (
                   <Tabs
                     value={view}
                     onValueChange={(v) => setView(String(v))}
@@ -1026,7 +1070,7 @@ export default function Home() {
                     nameA={pa?.name || '数据 A'}
                     nameB={pb?.name || '数据 B'}
                     drawKeys={comparable.map((m) => m.key)}
-                    hideMissingExtras={isManual}
+                    hideMissingExtras={isManual || arenaActive}
                     bestA={a.bestKeys}
                     bestB={b.bestKeys}
                     colorA={primaryColor}
@@ -1091,6 +1135,8 @@ export default function Home() {
                 <p className="chart-note">
                   {isManual
                     ? MANUAL_LABEL
+                    : arenaActive
+                      ? ARENA_LABEL + ' · 离线评分模型，非 HLTV 官方数据'
                     : hasDemo
                       ? '示例数值为虚构数据，不代表真实选手。'
                       : view === 'attributes'
@@ -1208,7 +1254,7 @@ export default function Home() {
                               <Info size={14} />
                             </TooltipTrigger>
                             <TooltipContent className="metric-tooltip">
-                              {m.description}
+                              {arenaActive && m.key === 'rating' ? 'Local Arena 离线评分模型，与 HLTV 官方 Rating 不同。' : m.description}
                             </TooltipContent>
                           </Tooltip>
                         </div>

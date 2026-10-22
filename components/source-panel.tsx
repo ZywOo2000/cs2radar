@@ -160,7 +160,7 @@ export function SourcePanel({
           </button>
         )}
       </div>
-      <form
+      {slot.data?.origin?.type !== 'local-arena' && <form
         onSubmit={(e) => {
           e.preventDefault();
           load();
@@ -199,7 +199,7 @@ export function SourcePanel({
             </>
           )}
         </button>
-      </form>
+      </form>}
       {slot.busy && (
         <output className="import-progress">
           <p>{slot.progress || '正在读取统计数据…'}</p>
@@ -225,7 +225,7 @@ export function SourcePanel({
                 slot.data.demo ? 'demo-indicator' : 'success-indicator'
               }
             >
-              {slot.data.demo ? '虚构示例' : '已读取 HLTV'}
+              {slot.data.demo ? '虚构示例' : slot.data.origin?.type === 'local-arena' ? 'Local Arena · 本地读取' : '已读取 HLTV'}
             </span>
             <span>{slot.data.players.length} 位选手</span>
           </div>
@@ -263,6 +263,7 @@ export function SourcePanel({
           <p className="source-title">{slot.data.title}</p>
           <p className="source-date">
             {slot.data.date || '日期以来源页面为准'} · 双方阵营合计
+            {slot.data.origin?.type === 'local-arena' && ' · 非 HLTV 官方数据'}
           </p>
           <div className="rating-highlight rating-only">
             <div>
@@ -335,7 +336,9 @@ export function SourcePanel({
       )}
       <div className="source-footer">
         <span className="status-dot" />
-        {slot.transport === 'extension'
+        {slot.data?.origin?.type === 'local-arena'
+          ? 'Local Arena 本机数据'
+          : slot.transport === 'extension'
           ? '浏览器扩展读取'
           : '服务器直接读取'} ·
         不估算缺失指标

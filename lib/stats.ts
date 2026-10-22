@@ -1,6 +1,6 @@
 export type Stats = Partial<Record<string, number>>;
-export type Player = {id:string;name:string;team:string;profileUrl?:string;stats:Record<string,Stats>;ratingVersion:string;detailLoaded?:boolean};
-export type Dataset = {id:string;title:string;event:string;date:string;kind:'match'|'event'|'player';sourceUrl:string;importedAt:string;scopes:{id:string;name:string}[];players:Player[];notes:string[];demo?:boolean};
+export type Player = {id:string;name:string;team:string;profileUrl?:string;isBot?:boolean;stats:Record<string,Stats>;ratingVersion:string;detailLoaded?:boolean};
+export type Dataset = {id:string;title:string;event:string;date:string;kind:'match'|'event'|'player';sourceUrl:string;importedAt:string;scopes:{id:string;name:string}[];players:Player[];notes:string[];demo?:boolean;origin?:{type:'local-arena';appVersion:string;ratingModel:string;preferredPlayerId:string;endReason:string|null;partial:boolean}};
 export type Metric = {key:string;label:string;name:string;min:number;max:number;decimals:number;unit?:string;inverse?:boolean;description:string};
 export const performance:Metric[] = [
  {key:'rating',label:'Rating',name:'综合评分',min:0,max:1.3,decimals:2,description:'HLTV 原始综合评分；版本见选手信息。雷达参考满刻度为 1.30，超过时按比例越出参考圈。'},

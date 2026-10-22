@@ -2531,3 +2531,14 @@ body::before {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Local Arena summary import; keep chart geometry in the existing stage. */
+.arena-import{margin:16px 0;padding:16px;border:1px solid #293946;background:#0b1219;color:#dce8f3;border-radius:5px}
+.arena-import-heading{display:flex;gap:16px;justify-content:space-between;align-items:center}.arena-import-heading p{margin:5px 0 0;font-size:12px;color:#91a6b5}
+.arena-file-button{cursor:pointer;position:relative}.arena-file-button:focus-within{outline:2px solid #ff8d4a;outline-offset:3px}.arena-file-button[aria-disabled=true]{opacity:.5;cursor:wait}
+.arena-file-button input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:inherit}
+.arena-message{display:block;margin-top:12px;font-size:13px;color:#ffcf8e;overflow-wrap:anywhere}.arena-roster{margin-top:14px}.arena-roster summary{cursor:pointer;font-size:13px;font-weight:600}
+.arena-compare{display:flex;gap:12px;align-items:end;margin:14px 0}.arena-compare label{display:grid;gap:6px;flex:1;font-size:12px}.arena-compare select{border:1px solid #344757;background:#101c27;color:#dce8f3;padding:9px;max-width:100%;min-width:0}
+.arena-roster fieldset{border:0;padding:0;margin:14px 0 0}.arena-roster legend{font-size:12px;color:#afc3d3;margin-bottom:8px}.arena-players{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:12px}
+.arena-players label{display:flex;align-items:center;gap:6px;min-width:0;padding:9px;background:#111f2a;font-size:12px;overflow-wrap:anywhere}.arena-players small{color:#8fa7b8;font-size:10px}.arena-quality{font-size:12px;color:#d0ab7b;margin-top:8px;overflow-wrap:anywhere}
+@media(max-width:600px){.arena-import-heading,.arena-compare{align-items:stretch;flex-direction:column}.arena-file-button{justify-content:center}.arena-players{grid-template-columns:1fr 1fr}}
