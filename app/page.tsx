@@ -23,37 +23,23 @@ import {
   Radio,
   Database,
   SlidersHorizontal,
-  Eye,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Table,
-  TableHeader,
-  TableHead,
-  TableBody,
-  TableCell,
-  TableRow,
-} from '@/components/ui/table';
-import {
   TooltipProvider,
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
 } from '@/components/ui/tooltip';
 import { Radar } from '@/components/radar';
+import { RadarDataTable } from '@/components/radar-data-table';
 import {
   performance,
   broadcastMetrics,
   attributes,
   extraMetrics,
   demo,
-  format,
   sharedMetrics,
   type Dataset,
 } from '@/lib/stats';
-import { exportChart } from '@/lib/export-chart';
-import { exportDynamicVideo } from '@/lib/export-video';
-import { exportSequenceVideo } from '@/lib/export-sequence-video';
+import { useRadarExports } from '@/hooks/use-radar-exports';
 import {
   SequenceRadar,
   type SequenceRadarHandle,
@@ -81,10 +67,11 @@ import {
   SERIES_COLOR_PRESETS,
 } from '@/lib/series-colors';
 import { useSlots } from '@/hooks/use-slots';
+import { useRadarModelTools } from '@/hooks/use-radar-model-tools';
 import { DonationButton } from '@/components/donation-button';
 import { LocalArenaImport } from '@/components/local-arena-import';
-import { arenaDataset } from '@/lib/local-arena';
-import { ARENA_LABEL, type ArenaPacket } from '@/lib/local-arena-protocol';
+import { arenaPlayerId, useArenaSources } from '@/hooks/use-arena-sources';
+import { ARENA_LABEL } from '@/lib/local-arena-protocol';
 export default function Home() {
   const extension = useHltvExtension();
   const manual = useManualDraft();
@@ -96,7 +83,6 @@ export default function Home() {
   const manualComparison = useMemo(() => manualComparisonState(manual.workspace), [manual.workspace]);
   const manualDataA = useMemo(() => manualDataset(manual.workspace.drafts.A, 'A', manualCompare), [manual.workspace.drafts.A, manualCompare]);
   const manualDataB = useMemo(() => manualDataset(manual.workspace.drafts.B, 'B', manualCompare), [manual.workspace.drafts.B, manualCompare]);
-  const [localDataset, setLocalDataset] = useState<Dataset | null>(null);
   const [transport, setTransport] = useState<Transport>('auto');
   const videoExportLock = useRef(false);
   const sequenceRef = useRef<SequenceRadarHandle>(null);
@@ -299,130 +285,14 @@ export default function Home() {
   const ratingMismatch = ratingVersionMismatch && !isManual;
   const manualRatingVersionNotice = isManual && ratingVersionMismatch &&
     Number.isFinite(sa.rating) && Number.isFinite(sb.rating);
-  function arenaPlayerId(data: Dataset) {
-    return data.players.find(p => p.id === data.origin?.preferredPlayerId)?.id ||
-      data.players.find(p => !p.isBot)?.id || data.players[0].id;
-  }
-  function setArenaSlot(index: number, data: Dataset, id: string) {
-    store.reset(index, { ...empty(), data, playerId: id, scopeId: 'all' });
-  }
-  function importArena(packet: ArenaPacket) {
-    if (exporting || exportingVideo || videoExportLock.current || busy || sequencePlaying)
-      throw Error('正在读取或导出，请结束后再导入本地对局。');
-    const data = arenaDataset(packet);
-    setArenaSlot(0, data, arenaPlayerId(data));
-    setLocalDataset(data); setMode('single'); setView('performance'); setActiveSlot(0);
-    setNotice('Local Arena 全员数据已导入。Rating 为离线模型，非 HLTV 官方评分。');
-  }
-  function compareArena(id: string) {
-    if (!localDataset || exporting || exportingVideo || busy || sequencePlaying) return;
-    const ownId = slots[0].data?.id === localDataset.id ? slots[0].playerId : arenaPlayerId(localDataset);
-    if (!localDataset.players.some(p => p.id === id) || id === ownId) return;
-    setArenaSlot(0, localDataset, ownId); setArenaSlot(1, localDataset, id);
-    setMode('compare'); setView('performance'); setActiveSlot(0);
-  }
-  function videoArena(ids: string[]) {
-    if (!localDataset || exporting || exportingVideo || busy || sequencePlaying) return;
-    if (ids.length < 2 || ids.length > 5 || new Set(ids).size !== ids.length || ids.some(id => !localDataset.players.some(p => p.id === id))) return;
-    ids.forEach((id, index) => setArenaSlot(index, localDataset, id));
-    for (let index = ids.length; index < 5; index++) store.reset(index);
-    setMode('video'); setView('performance'); setActiveSlot(0);
-  }
-  async function download() {
-    if (!ready || busy || exporting || exportingVideo) return;
-    setExporting(true);
-    setNotice('');
-    try {
-      if (!pa) throw new Error('请先选择选手。');
-      await exportChart(
-        view === 'performance' ? '选手比赛表现' : 'HLTV 选手属性',
-        view === 'performance'
-          ? [...ms, performance.find((m) => m.key === 'swing')!].filter(m =>
-              (!isManual && !arenaActive) || m.key !== 'swing' || Number.isFinite(sa.swing) ||
-              (comp && pb && Number.isFinite(sb.swing)))
-          : comparable,
-        {
-          name: pa.name,
-          context: context(a),
-          source: isManual
-            ? MANUAL_LABEL
-            : a.data?.origin?.type === 'local-arena' ? ARENA_LABEL : pa.profileUrl || a.data?.sourceUrl || '',
-          manual: isManual,
-          provenance: a.data?.origin?.type,
-          color: primaryColor,
-          version: pa.ratingVersion,
-          stats: sa,
-          demo: !!a.data?.demo,
-        },
-        comp && pb
-          ? {
-              name: pb.name,
-              context: context(b),
-              source: isManual ? MANUAL_LABEL : b.data?.origin?.type === 'local-arena' ? ARENA_LABEL : pb.profileUrl || b.data?.sourceUrl || '',
-              manual: isManual,
-              provenance: b.data?.origin?.type,
-              color: secondaryColor,
-              version: pb.ratingVersion,
-              stats: sb,
-              demo: !!b.data?.demo,
-            }
-          : undefined,
-      );
-      setNotice('PNG 已生成，浏览器将开始下载。');
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : '导出失败。');
-    } finally {
-      setExporting(false);
-    }
-  }
-  async function downloadVideo() {
-    if (videoExportLock.current || !ready || busy || exporting) return;
-    videoExportLock.current = true;
-    setExportingVideo(true);
-    setVideoProgress(0);
-    setNotice('');
-    try {
-      if (isVideo) {
-        if (!sequenceRef.current) throw new Error('视频预览尚未就绪。');
-        if (!sequenceReady)
-          throw new Error('至少选择两人，且共同可绘制指标不少于三项。');
-        const result = await exportSequenceVideo(
-          view === 'performance' ? '选手比赛表现' : 'HLTV 选手属性',
-          videoPeople,
-          sequenceRef.current,
-          setVideoProgress,
-        );
-        setNotice(
-          `连续视频已生成：${result.fileName}（${result.format}，浏览器将开始下载）`,
-        );
-        return;
-      }
-      if (!pa) throw new Error('请先选择选手。');
-      const result = await exportDynamicVideo(
-        view === 'performance' ? '选手比赛表现' : 'HLTV 选手属性',
-        { name: pa.name, context: context(a) },
-        comp && pb ? { name: pb.name, context: context(b) } : undefined,
-        setVideoProgress,
-      );
-      setNotice(
-        `动态视频已生成：${result.fileName}（${result.format}，浏览器将开始下载）`,
-      );
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : '视频导出失败，请重试。');
-    } finally {
-      videoExportLock.current = false;
-      setExportingVideo(false);
-      setVideoProgress(0);
-    }
-  }
-  const actions = useRef({ load, choose });
-  const manualRef = useRef(manual.workspace);
-  const configRef = useRef({ mode, view });
-  useEffect(() => {
-    actions.current = { load, choose };
-    manualRef.current = manual.workspace;
-    configRef.current = { mode, view };
+  const { localDataset, importArena, compareArena, videoArena } = useArenaSources({
+    store, slots, busy, sequencePlaying, exporting, exportingVideo, videoExportLock,
+    setMode, setView, setActiveSlot, setNotice,
   });
+  const { download, downloadVideo } = useRadarExports({ ready, busy, exporting, exportingVideo, isVideo,
+    sequenceReady, isManual, arenaActive, comp, view, ms, comparable, a, b, pa, pb, sa, sb,
+    primaryColor, secondaryColor, videoPeople, sequenceRef, videoExportLock,
+    setExporting, setExportingVideo, setVideoProgress, setNotice });
   useEffect(() => {
     try {
       const saved = JSON.parse(
@@ -438,143 +308,7 @@ export default function Home() {
       }
     } catch {}
   }, []);
-  useEffect(() => {
-    type Tool = {
-      name: string;
-      description: string;
-      inputSchema: object;
-      annotations: { readOnlyHint: boolean; untrustedContentHint: boolean };
-      execute: (x: unknown) => unknown;
-    };
-    const ctx = (
-      document as Document & {
-        modelContext?: {
-          registerTool: (
-            tool: Tool,
-            opts: { signal: AbortSignal },
-          ) => void | Promise<void>;
-        };
-      }
-    ).modelContext;
-    if (!ctx?.registerTool) return;
-    const life = new AbortController();
-    const read = () => ({
-      mode: configRef.current.mode,
-      view: configRef.current.view,
-      manual: {
-        ...manualRef.current.drafts.A,
-        ...parseManual(manualRef.current.drafts.A),
-        source: MANUAL_LABEL,
-      },
-      manualComparison: {
-        mode: manualRef.current.mode,
-        A: { ...manualRef.current.drafts.A, ...parseManual(manualRef.current.drafts.A) },
-        B: { ...manualRef.current.drafts.B, ...parseManual(manualRef.current.drafts.B) },
-        ready: manualComparisonState(manualRef.current).ready,
-        comparableMetrics: manualComparisonState(manualRef.current).comparable.map(m => m.key),
-      },
-      slots: store.getSnapshot().map((s, i) => ({
-        slot: 'ABCDE'[i],
-        source: s.data?.sourceUrl || null,
-        origin: s.data?.origin || null,
-        player: player(s)?.name || null,
-        playerId: s.playerId,
-        scopeId: s.scopeId,
-        stats: stats(s),
-        error: s.error,
-        busy: s.busy,
-        demo: !!s.data?.demo,
-      })),
-    });
-    const tools: Tool[] = [
-      {
-        name: 'import_hltv_source',
-        description:
-          '在雷达图页面导入一份 HLTV 比赛或赛事链接，更新指定侧。失败返回错误并保留原数据。',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            slot: { enum: ['A', 'B', 'C', 'D', 'E'] },
-            url: { type: 'string' },
-          },
-          required: ['slot', 'url'],
-          additionalProperties: false,
-        },
-        annotations: { readOnlyHint: false, untrustedContentHint: true },
-        execute: async (input) => {
-          const x = input as { slot?: string; url?: string };
-          if (
-            !x ||
-            !['A', 'B', 'C', 'D', 'E'].includes(x.slot || '') ||
-            typeof x.url !== 'string'
-          )
-            throw new Error('需要 slot A–E 与 url。');
-          await actions.current.load('ABCDE'.indexOf(x.slot!), x.url);
-          return read();
-        },
-      },
-      {
-        name: 'select_comparison_player',
-        description: '选择已导入来源中的选手和统计范围，可切换单人或双人展示。',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            slot: { enum: ['A', 'B', 'C', 'D', 'E'] },
-            playerId: { type: 'string' },
-            scopeId: { type: 'string' },
-            mode: { enum: ['single', 'compare', 'video', 'manual'] },
-          },
-          required: ['slot', 'playerId'],
-          additionalProperties: false,
-        },
-        annotations: { readOnlyHint: false, untrustedContentHint: true },
-        execute: async (input) => {
-          const x = input as {
-            slot?: string;
-            playerId?: string;
-            scopeId?: string;
-            mode?: string;
-          };
-          if (
-            !x ||
-            !['A', 'B', 'C', 'D', 'E'].includes(x.slot || '') ||
-            typeof x.playerId !== 'string' ||
-            (x.mode &&
-              !['single', 'compare', 'video', 'manual'].includes(x.mode))
-          )
-            throw new Error('选择参数无效。');
-          await actions.current.choose(
-            'ABCDE'.indexOf(x.slot!),
-            x.playerId,
-            x.scopeId,
-          );
-          if (x.mode) {
-            configRef.current.mode = x.mode;
-            setMode(x.mode);
-          }
-          return read();
-        },
-      },
-      {
-        name: 'get_radar_comparison',
-        description: '读取当前选手、统计范围、原始数据与读取状态。',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-          additionalProperties: false,
-        },
-        annotations: { readOnlyHint: true, untrustedContentHint: true },
-        execute: read,
-      },
-    ];
-    for (const tool of tools)
-      try {
-        void Promise.resolve(
-          ctx.registerTool(tool, { signal: life.signal }),
-        ).catch(() => {});
-      } catch {}
-    return () => life.abort();
-  }, [store]);
+  useRadarModelTools({ store, workspace: manual.workspace, mode, view, actions: { load, choose }, setMode });
   return (
     <TooltipProvider>
       <main className="site-shell">
@@ -1173,134 +907,10 @@ export default function Home() {
             <span>Rating 按手动填写值比较；两侧版本未统一或未标注。</span>
           </div>
         )}
-        <section
-          className={'data-section' + (isManual ? ' manual-data-section' : '')}
-        >
-          <div className="section-heading">
-            <div>
-              <div className="eyebrow">THE NUMBERS</div>
-              <h2>原始数据</h2>
-            </div>
-            <div className="section-heading-actions">
-              <span className="muted small">
-                {isManual ? '“暂无”表示尚未填写' : '“暂无”表示来源未提供'}
-              </span>
-              {anyData && tableMetrics.length > visibleTableMetrics.length && (
-                <button
-                  className="button secondary compact-button"
-                  type="button"
-                  onClick={() => setShowAllStats(true)}
-                >
-                  <Eye size={15} />
-                  查看全部 {tableMetrics.length} 项
-                </button>
-              )}
-              {anyData && showAllStats && (
-                <button
-                  className="button secondary compact-button"
-                  type="button"
-                  onClick={() => setShowAllStats(false)}
-                >
-                  收起数据
-                </button>
-              )}
-            </div>
-          </div>
-          {anyData ? (
-            <Table className="stats-table">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>数据指标</TableHead>
-                  <TableHead className="text-a" style={{ color: primaryColor }}>
-                    A · {pa?.name || '未选择'}
-                    <small>
-                      {a.data?.scopes.find((x) => x.id === a.scopeId)?.name}
-                    </small>
-                  </TableHead>
-                  {comp && (
-                    <TableHead
-                      className="text-b"
-                      style={{ color: secondaryColor }}
-                    >
-                      B · {pb?.name || '未选择'}
-                      <small>
-                        {b.data?.scopes.find((x) => x.id === b.scopeId)?.name}
-                      </small>
-                    </TableHead>
-                  )}
-                  {comp && <TableHead>差值 A − B</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visibleTableMetrics.map((m) => {
-                  const av = sa[m.key],
-                    bv = sb[m.key],
-                    delta =
-                      av !== undefined && bv !== undefined
-                        ? av - bv
-                        : undefined,
-                    noDelta = m.key === 'rating' && ratingMismatch;
-                  return (
-                    <TableRow key={m.key}>
-                      <TableCell>
-                        <div className="metric-name">
-                          <b>{m.label}</b>
-                          <span>{m.name}</span>
-                          <Tooltip>
-                            <TooltipTrigger
-                              className="info-button"
-                              aria-label={m.label + '说明'}
-                            >
-                              <Info size={14} />
-                            </TooltipTrigger>
-                            <TooltipContent className="metric-tooltip">
-                              {arenaActive && m.key === 'rating' ? 'Local Arena 离线评分模型，与 HLTV 官方 Rating 不同。' : m.description}
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </TableCell>
-                      <TableCell
-                        className="numeric text-a"
-                        style={{ color: primaryColor }}
-                      >
-                        {format(av, m)}
-                      </TableCell>
-                      {comp && (
-                        <TableCell
-                          className="numeric text-b"
-                          style={{ color: secondaryColor }}
-                        >
-                          {format(bv, m)}
-                        </TableCell>
-                      )}
-                      {comp && (
-                        <TableCell className="numeric muted">
-                          {noDelta
-                            ? '版本不可比'
-                            : delta === undefined
-                              ? '暂无'
-                              : (delta > 0 ? '+' : '') +
-                                delta.toFixed(m.decimals) +
-                                (m.unit === '%' ? ' 个百分点' : '')}
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="table-empty">
-              <div className="empty-grid-icon">
-                <Crosshair size={22} />
-              </div>
-              <p>导入数据后，Rating、ADR、KAST 与火力值将在这里展示。</p>
-              <button className="text-button" onClick={showDemo}>
-                使用虚构示例体验图表 <ArrowUpRight size={14} />
-              </button>
-            </div>
-          )}
-        </section>
+        <RadarDataTable isManual={isManual} anyData={anyData} comp={comp} arenaActive={arenaActive}
+          ratingMismatch={!!ratingMismatch} showAllStats={showAllStats} setShowAllStats={setShowAllStats}
+          showDemo={showDemo} tableMetrics={tableMetrics} visibleTableMetrics={visibleTableMetrics}
+          a={a} b={b} pa={pa} pb={pb} sa={sa} sb={sb} primaryColor={primaryColor} secondaryColor={secondaryColor} />
         <details className="methodology">
           <summary>
             <Info size={16} />

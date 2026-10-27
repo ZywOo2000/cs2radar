@@ -6,9 +6,11 @@
 
 超过 1800 字符的链接或不支持压缩的环境自动改用 `.radar.json` 文件。软件保存文件并打开网站后，点击“导入本地对局”选择该文件。软件打开浏览器成功只代表系统接收打开请求，不代表网站已收到数据；失败时可再次使用文件入口。
 
-## 协议 v1
+## 协议 v2 与 v1 兼容
 
-`lib/local-arena-protocol.ts` 同步到面板的 `Panel/src/lib/radar-protocol.ts`。协议名 `cs2-radar.local-arena`，版本 1，评分模型 `local-arena-offline-v1`。整包为 UTF-8 JSON，最大 256 KiB、最多 64 位选手；Steam ID 保留字符串。
+`lib/local-arena-protocol.ts` 是权威源，通过 `node scripts/sync-arena-protocol.mjs <Panel目录>` 生成面板副本和校验摘要。协议名 `cs2-radar.local-arena`，当前版本 2，评分模型 `local-arena-offline-v1`；网站继续接收版本 1。整包为 UTF-8 JSON，最大 256 KiB、最多 64 位选手；Steam ID 保留字符串。
+
+v2 包含对局采集版本与每位选手的指标状态（有效、未知、冲突）。新采集数据能保留真实零值；历史数据缺乏采集证据时隐藏无法确认的事件零值和依赖它们的 Rating。v1 文件没有采集版本，缺乏证明的零值按未知处理。旧文件不会补回缺失字段，应使用新版软件重新生成。
 
 顶层包含 `schema/version/appVersion/ratingModel/preferredPlayerId/match/players/warnings`。`match` 保存原始记录 ID、地图、开始结束时间、结束原因、回合数、队伍比分及 partial 标记。选手保存 ID、姓名、开局队伍、BOT 标记、原始计数、可选离线 Rating 和质量说明。未可靠记录的统计字段必须省略，不能填零。
 
@@ -26,4 +28,4 @@ KPR/ADR/DPR 等按原始计数换算，存活率仅使用已经核对的逐回�
 - 链接导入、再次打开链接、超长文件回退、损坏文件及浏览器不支持解压。
 - PNG、两种动画、MP4/WebM、结尾定格一秒。
 
-本次按用户要求不执行功能测试或浏览器验证，只运行发布构建。网站按原有会话方式保留导入数据，刷新后可以再次导入文件；手动草稿仍按原规则保存。
+网站按原有会话方式保留导入数据，刷新后可以再次导入文件；手动草稿仍按原规则保存。真实游戏采集需在安装新版完整包后另行验收。

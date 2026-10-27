@@ -1,0 +1,7 @@
+{
+  "appVersion": "1.4.3.3",
+  "match": {"captureVersion":1,"endReason":null,"endedAt":null,"id":"1","map":"de_test","partial":false,"rounds":3,"startedAt":"2026-01-01","teamAScore":0,"teamBScore":0},
+  "players": [{"id":"a","isBot":false,"metricStatus":{"adr":"valid","kast":"valid","kpr":"valid","multiKillPct":"valid","rating":"valid","surviving":"valid"},"name":"A","raw":{"assists":0,"clutchAttempts":0,"clutchesWon":0,"damage":0,"deaths":3,"headshots":0,"kastRounds":0,"kills":0,"multikill2":0,"multikill3":0,"multikill4":0,"multikill5":0,"rounds":3,"survivedRounds":0,"tradeKills":0},"teamId":"A","warnings":[]}],
+  "preferredPlayerId":"a",
+  "warnings":["结束原因：未记录；按本地记录统计 3 回合。"]
+}

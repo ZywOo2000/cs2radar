@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Dataset } from '@/lib/stats';
 import { ARENA_MAX_BYTES, decodeArenaFragment, parseArenaJson, type ArenaPacket } from '@/lib/local-arena-protocol';
+import { createArenaImportController } from '@/lib/arena-import-controller';
 
 export function LocalArenaImport({ dataset, currentPlayerId, disabled, onImport, onCompare, onVideo }: {
   dataset: Dataset | null; currentPlayerId: string; disabled: boolean;
@@ -10,21 +11,18 @@ export function LocalArenaImport({ dataset, currentPlayerId, disabled, onImport,
   const [message, setMessage] = useState(''), [reading, setReading] = useState(false);
   const [other, setOther] = useState(''), [selection, setSelection] = useState<string[]>([]);
   const callback = useRef(onImport);
-  useEffect(() => { callback.current = onImport; }, [onImport]);
+  callback.current = onImport;
+  const controller = useRef<ReturnType<typeof createArenaImportController<ArenaPacket>> | null>(null);
   useEffect(() => {
-    let active = true, request = 0;
+    const task = createArenaImportController<ArenaPacket>({ busy: setReading, message: setMessage, commit: packet => callback.current(packet) });
+    controller.current = task;
     const read = () => {
       const hash = window.location.hash;
-      if (!new URLSearchParams(hash.slice(1)).has('arena')) return;
-      const own = ++request; setReading(true);
-      void decodeArenaFragment(hash).then(packet => {
-        if (!active || request !== own) return;
-        callback.current(packet); clearArenaHash(); setMessage('本场全员已导入。');
-      }).catch(error => { if (active && request === own) setMessage(error instanceof Error ? error.message : '导入链接失败，请使用数据文件。'); })
-        .finally(() => { if (active && request === own) setReading(false); });
+      if (!new URLSearchParams(hash.slice(1)).has('arena')) { task.cancel(); return; }
+      void task.run(() => decodeArenaFragment(hash), () => clearArenaHash(hash));
     };
     read(); window.addEventListener('hashchange', read);
-    return () => { active = false; window.removeEventListener('hashchange', read); };
+    return () => { task.dispose(); if (controller.current === task) controller.current = null; window.removeEventListener('hashchange', read); };
   }, []);
   useEffect(() => {
     if (!dataset) return;
@@ -38,14 +36,12 @@ export function LocalArenaImport({ dataset, currentPlayerId, disabled, onImport,
     <div className="arena-import-heading"><div><strong>Local Arena 本地对局</strong><p>从软件一键生成，或导入 .radar.json 文件。无需扩展。</p></div>
       <label className="button secondary arena-file-button" aria-disabled={locked}>
         {reading ? '正在读取…' : '导入本地对局'}
-        <input type="file" accept=".json,.radar.json,application/json" disabled={locked} onChange={async event => {
+        <input type="file" accept=".json,.radar.json,application/json" disabled={locked} onChange={event => {
           const input = event.currentTarget, file = input.files?.[0]; input.value = ''; if (!file) return;
-          setReading(true); setMessage('');
-          try {
+          void controller.current?.run(async () => {
             if (file.size > ARENA_MAX_BYTES) throw Error('雷达数据文件超过 256 KB。');
-            callback.current(parseArenaJson(await file.text())); clearArenaHash(); setMessage('本场全员已导入。');
-          } catch (error) { setMessage(error instanceof Error ? error.message : '文件导入失败，原有数据已保留。'); }
-          finally { setReading(false); }
+            return parseArenaJson(await file.text());
+          });
         }} />
       </label>
     </div>
@@ -64,8 +60,9 @@ export function LocalArenaImport({ dataset, currentPlayerId, disabled, onImport,
   </section>;
 }
 
-function clearArenaHash() {
+function clearArenaHash(consumed: string) {
   // Remove the summary only after a successful import. No request uses it.
+  if (window.location.hash !== consumed) return;
   const params = new URLSearchParams(window.location.hash.slice(1)); params.delete('arena');
   const rest = params.toString();
   window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + (rest ? '#' + rest : ''));
