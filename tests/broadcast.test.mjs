@@ -16,6 +16,25 @@ test('missing broadcast metrics do not show Best; a real zero still can',()=>{
  assert.equal($('[data-best-label-for]').length,1);
  assert.equal($('[data-best-label-for]').text(),'Best');
 });
+test('sequence fades missing values and their adjacent edges without changing fixed axes',()=>{
+ const a={kpr:.85,surviving:43,adr:85,kast:78,multiKillPct:20,rating:1.3,firepower:80,swing:-2};
+ const $=load(renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a,nameA:'A',hideMissingExtras:true,metricOpacity:{rating:.5,firepower:.4,swing:.2}})));
+ assert.equal($('[data-metric-value]').length,6);
+ assert.equal($('[data-series="A"] polygon').attr('opacity'),'0.5');
+ assert.equal($('[data-series="A"] line').length,6);
+ assert.equal($('[data-series="A"] line[data-axis-from="4"]').attr('opacity'),'0.5');
+ assert.equal($('[data-firepower]').attr('opacity'),'0.4');
+ assert.equal($('[data-swing="A"]').attr('opacity'),'0.2');
+});
+test('isolated valid axes remain visible as points without inventing connections',()=>{
+ const a={kpr:0,adr:85,multiKillPct:20};
+ const $=load(renderToStaticMarkup(createElement(BroadcastRadar,{metrics:broadcastMetrics,a,nameA:'A',hideMissingExtras:true})));
+ assert.equal($('[data-series="A"] polygon, [data-series="A"] line').length,0);
+ assert.equal($('[data-series="A"] circle').length,3);
+ assert.deepEqual($('[data-series="A"] circle').map((_,el)=>$(el).attr('data-axis')).get(),['0','2','4']);
+ assert.equal($('[data-series="A"] circle[data-axis="0"]').attr('cx'),'500');
+ assert.equal($('[data-series="A"] circle[data-axis="0"]').attr('cy'),'365');
+});
 test('reference screenshot thresholds all land on the same outer ring and permit overflow',()=>{
  assert.deepEqual(broadcastMetrics.map(m=>m.max),[.85,43,85,78,20,1.3]);
  assert.deepEqual(broadcastMetrics.map(m=>m.min),[.42,15.7,47.5,54.5,7,.55]);

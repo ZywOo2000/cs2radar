@@ -1699,6 +1699,19 @@ svg {
   position: relative;
   z-index: 1;
 }
+/* The generic broadcast SVG uses height:auto. In a 16:9 sequence frame it
+   must instead fit the same content rectangle used by video export. */
+.sequence-export-frame .radar-svg,
+.sequence-export-frame .radar-svg.broadcast-svg {
+  position: absolute;
+  left: 5%;
+  top: 7.4074%;
+  width: 90%;
+  height: 85.1852%;
+  min-width: 0;
+  min-height: 0;
+  max-height: none;
+}
 .chart-panel:has(.broadcast-svg) {
   background: #0b1323;
 }

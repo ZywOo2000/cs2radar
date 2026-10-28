@@ -10,7 +10,7 @@ export const SEQUENCE_FINAL_HOLD_MS=1000;
 export const SEQUENCE_CENTER_ENTRY_MS=1650;
 
 export type SequenceParticipant={name:string;context:string;stats:Stats;color:string;bestKeys:string[];ratingVersion:string};
-export type SequenceFrame={stats:Stats;color:string;bestKeys:string[];bestOpacity:number;fromIndex:number;toIndex:number;mix:number;nameFromOpacity:number;nameToOpacity:number;done:boolean};
+export type SequenceFrame={stats:Stats;metricOpacity:Record<string,number>;color:string;bestKeys:string[];bestOpacity:number;fromIndex:number;toIndex:number;mix:number;nameFromOpacity:number;nameToOpacity:number;done:boolean};
 
 const clamp=(v:number)=>Math.max(0,Math.min(1,v));
 export const sequenceEase=(v:number)=>{v=clamp(v);return v<.5?4*v*v*v:1-Math.pow(-2*v+2,3)/2};
@@ -22,32 +22,54 @@ const interpolateStats=(metrics:Metric[],a:Stats,b:Stats,t:number):Stats=>Object
  if(!Number.isFinite(av)||!Number.isFinite(bv))return [];
  return [[m.key,av!+(bv!-av!)*t]];
 }));
+const selectedStats=(metrics:Metric[],stats:Stats):Stats=>Object.fromEntries(metrics.flatMap(m=>
+ Number.isFinite(stats[m.key])?[[m.key,stats[m.key]]]:[]));
+const opacityFor=(stats:Stats):Record<string,number>=>Object.fromEntries(Object.keys(stats).map(key=>[key,1]));
+function morphStats(metrics:Metric[],a:Stats,b:Stats,t:number){
+ const stats:Stats={},metricOpacity:Record<string,number>={};
+ for(const m of metrics){
+  const av=a[m.key],bv=b[m.key],hasA=Number.isFinite(av),hasB=Number.isFinite(bv);
+  if(hasA&&hasB){stats[m.key]=av!+(bv!-av!)*t;metricOpacity[m.key]=1}
+  else if(hasA){stats[m.key]=av;metricOpacity[m.key]=1-t}
+  else if(hasB){stats[m.key]=bv;metricOpacity[m.key]=t}
+ }
+ return {stats,metricOpacity};
+}
 
 export function sequenceEntryMs(motion:RadarMotionKind){return motion==='rings'?RADAR_RING_PAUSE_MS+RADAR_RING_EXPAND_MS:SEQUENCE_CENTER_ENTRY_MS}
 export function sequenceDuration(count:number,motion:RadarMotionKind){if(count<1)return 0;return sequenceEntryMs(motion)+SEQUENCE_HOLD_MS+Math.max(0,count-1)*(SEQUENCE_MORPH_MS+SEQUENCE_HOLD_MS)+SEQUENCE_FINAL_HOLD_MS-SEQUENCE_HOLD_MS}
 export function sequenceArrivalTime(index:number,motion:RadarMotionKind){return index<=0?sequenceEntryMs(motion):sequenceEntryMs(motion)+SEQUENCE_HOLD_MS+index*SEQUENCE_MORPH_MS+(index-1)*SEQUENCE_HOLD_MS}
 
 export function sequenceFrameAt(people:SequenceParticipant[],metrics:Metric[],elapsed:number,motion:RadarMotionKind):SequenceFrame{
- if(!people.length)return {stats:{},color:'#bddbff',bestKeys:[],bestOpacity:0,fromIndex:0,toIndex:0,mix:0,nameFromOpacity:0,nameToOpacity:0,done:true};
+ if(!people.length)return {stats:{},metricOpacity:{},color:'#bddbff',bestKeys:[],bestOpacity:0,fromIndex:0,toIndex:0,mix:0,nameFromOpacity:0,nameToOpacity:0,done:true};
  const entry=sequenceEntryMs(motion),total=sequenceDuration(people.length,motion),time=Math.max(0,elapsed);
  if(time<entry){
   const pause=motion==='rings'?RADAR_RING_PAUSE_MS:0;
   const p=sequenceEase((time-pause)/(entry-pause));
   const start:Stats=Object.fromEntries(metrics.flatMap(m=>Number.isFinite(people[0].stats[m.key])?[[m.key,rawAtNormalized(m,motion==='rings'?20:0)]]:[]));
-  return {stats:interpolateStats(metrics,start,people[0].stats,p),color:people[0].color,bestKeys:people[0].bestKeys,bestOpacity:p,fromIndex:0,toIndex:0,mix:p,nameFromOpacity:1,nameToOpacity:0,done:false};
+  const stats=interpolateStats(metrics,start,people[0].stats,p);
+  return {stats,metricOpacity:opacityFor(stats),color:people[0].color,bestKeys:people[0].bestKeys,bestOpacity:p,fromIndex:0,toIndex:0,mix:p,nameFromOpacity:1,nameToOpacity:0,done:false};
  }
  let cursor=entry;
  for(let i=0;i<people.length-1;i++){
-  if(time<cursor+SEQUENCE_HOLD_MS)return {stats:people[i].stats,color:people[i].color,bestKeys:people[i].bestKeys,bestOpacity:1,fromIndex:i,toIndex:i,mix:0,nameFromOpacity:1,nameToOpacity:0,done:false};
+  if(time<cursor+SEQUENCE_HOLD_MS){const stats=selectedStats(metrics,people[i].stats);return {stats,metricOpacity:opacityFor(stats),color:people[i].color,bestKeys:people[i].bestKeys,bestOpacity:1,fromIndex:i,toIndex:i,mix:0,nameFromOpacity:1,nameToOpacity:0,done:false}}
   cursor+=SEQUENCE_HOLD_MS;
   if(time<cursor+SEQUENCE_MORPH_MS){
    const raw=clamp((time-cursor)/SEQUENCE_MORPH_MS),p=sequenceEase(raw),fade=raw<.5?1-raw*2:(raw-.5)*2;
-   return {stats:interpolateStats(metrics,people[i].stats,people[i+1].stats,p),color:interpolateColor(people[i].color,people[i+1].color,p),bestKeys:raw<.5?people[i].bestKeys:people[i+1].bestKeys,bestOpacity:fade,fromIndex:i,toIndex:i+1,mix:raw,nameFromOpacity:1-raw,nameToOpacity:raw,done:false};
+   return {...morphStats(metrics,people[i].stats,people[i+1].stats,p),color:interpolateColor(people[i].color,people[i+1].color,p),bestKeys:raw<.5?people[i].bestKeys:people[i+1].bestKeys,bestOpacity:fade,fromIndex:i,toIndex:i+1,mix:raw,nameFromOpacity:1-raw,nameToOpacity:raw,done:false};
   }
   cursor+=SEQUENCE_MORPH_MS;
  }
  const last=people.length-1;
- return {stats:people[last].stats,color:people[last].color,bestKeys:people[last].bestKeys,bestOpacity:1,fromIndex:last,toIndex:last,mix:1,nameFromOpacity:1,nameToOpacity:0,done:time>=total};
+ const stats=selectedStats(metrics,people[last].stats);
+ return {stats,metricOpacity:opacityFor(stats),color:people[last].color,bestKeys:people[last].bestKeys,bestOpacity:1,fromIndex:last,toIndex:last,mix:1,nameFromOpacity:1,nameToOpacity:0,done:time>=total};
+}
+
+// Preserve the fixed axes while excluding incompatible Rating from every frame.
+// Values missing from only some players remain available for a real-value fade.
+export function renderableSequenceMetrics(metrics:Metric[],people:SequenceParticipant[]){
+ const versions=new Set(people.map(p=>p.ratingVersion));
+ return metrics.filter(m=>(m.key!=='rating'||people.length<2||(versions.size===1&&!versions.has('未标注')))&&people.some(p=>Number.isFinite(p.stats[m.key])));
 }
 
 export function commonSequenceMetrics(metrics:Metric[],people:SequenceParticipant[]){

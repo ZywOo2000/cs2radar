@@ -1,6 +1,7 @@
 import type { SequenceRadarHandle } from '@/components/sequence-radar';
 import { radarViewBox, type RadarViewBox } from './radar-bounds';
-import { supportedVideoMime } from './export-video-utils';
+import { assertFiniteRadarGeometry } from './radar-snapshot';
+import { createVideoRecorder, supportedVideoMime } from './export-video-utils';
 import { pickRadarMotion, type RadarMotionKind } from './radar-motion';
 import {
   SEQUENCE_VIDEO_FRAME,
@@ -44,6 +45,7 @@ async function drawSvg(
   }
 }
 function clean(live: SVGSVGElement, box: RadarViewBox) {
+  assertFiniteRadarGeometry(live);
   const clone = live.cloneNode(true) as SVGSVGElement;
   clone.querySelectorAll('animate,title,desc').forEach((n) => n.remove());
   clone
@@ -87,8 +89,13 @@ export async function exportSequenceVideo(
     typeof HTMLCanvasElement.prototype.captureStream !== 'function'
   )
     throw new Error('当前浏览器不支持视频导出，请使用最新版 Chrome 或 Edge。');
-  const mime = supportedVideoMime((t) => MediaRecorder.isTypeSupported(t));
+  let mime = supportedVideoMime((t) => MediaRecorder.isTypeSupported(t));
   if (!mime) throw new Error('当前浏览器没有可用的视频编码器。');
+  const prepareStarted = performance.now();
+  while (controller.isPrepared && !controller.isPrepared()) {
+    if (performance.now() - prepareStarted > 10000) throw new Error('视频画面初始化超时，请重试。');
+    await waitFrame();
+  }
   controller.stop();
   const motion = pickRadarMotion(),
     boxes: RadarViewBox[] = [];
@@ -115,10 +122,7 @@ export async function exportSequenceVideo(
     chunks: Blob[] = [];
   let recorder: MediaRecorder;
   try {
-    recorder = new MediaRecorder(stream, {
-      mimeType: mime,
-      videoBitsPerSecond: 8_000_000,
-    });
+    ({recorder, mime} = createVideoRecorder(stream));
   } catch {
     stream.getTracks().forEach((t) => t.stop());
     throw new Error('视频编码器启动失败。');

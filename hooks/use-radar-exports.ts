@@ -16,16 +16,18 @@ type Args = {
   ready: boolean; busy: boolean; exporting: boolean; exportingVideo: boolean; isVideo: boolean;
   sequenceReady: boolean; isManual: boolean; arenaActive: boolean; comp: boolean; view: string;
   ms: Metric[]; comparable: Metric[]; a: Slot; b: Slot; pa: Player | undefined; pb: Player | undefined;
-  sa: Stats; sb: Stats; primaryColor: string; secondaryColor: string; videoPeople: SequenceParticipant[];
-  sequenceRef: RefObject<SequenceRadarHandle | null>; videoExportLock: RefObject<boolean>;
+  sa: Stats; sb: Stats; primaryColor: string; secondaryColor: string;
+  createSequenceExport: () => Promise<{ controller: SequenceRadarHandle; people: SequenceParticipant[] }>;
+  releaseSequenceExport: () => void; isSourceBusy: () => boolean; exportLock: RefObject<boolean>;
   setExporting: (value: boolean) => void; setExportingVideo: (value: boolean) => void;
   setVideoProgress: (value: number) => void; setNotice: (value: string) => void;
 };
 export function useRadarExports({ ready, busy, exporting, exportingVideo, isVideo, sequenceReady, isManual,
   arenaActive, comp, view, ms, comparable, a, b, pa, pb, sa, sb, primaryColor, secondaryColor,
-  videoPeople, sequenceRef, videoExportLock, setExporting, setExportingVideo, setVideoProgress, setNotice }: Args) {
+  createSequenceExport, releaseSequenceExport, isSourceBusy, exportLock, setExporting, setExportingVideo, setVideoProgress, setNotice }: Args) {
   async function download() {
-    if (!ready || busy || exporting || exportingVideo) return;
+    if (exportLock.current || !ready || busy || isSourceBusy() || exporting || exportingVideo) return;
+    exportLock.current = true;
     setExporting(true);
     setNotice('');
     try {
@@ -68,24 +70,25 @@ export function useRadarExports({ ready, busy, exporting, exportingVideo, isVide
     } catch (e) {
       setNotice(e instanceof Error ? e.message : '导出失败。');
     } finally {
+      exportLock.current = false;
       setExporting(false);
     }
   }
   async function downloadVideo() {
-    if (videoExportLock.current || !ready || busy || exporting) return;
-    videoExportLock.current = true;
+    if (exportLock.current || !ready || busy || isSourceBusy() || exporting) return;
+    exportLock.current = true;
     setExportingVideo(true);
     setVideoProgress(0);
     setNotice('');
     try {
       if (isVideo) {
-        if (!sequenceRef.current) throw new Error('视频预览尚未就绪。');
         if (!sequenceReady)
           throw new Error('至少选择两人，且共同可绘制指标不少于三项。');
+        const snapshot = await createSequenceExport();
         const result = await exportSequenceVideo(
           view === 'performance' ? '选手比赛表现' : 'HLTV 选手属性',
-          videoPeople,
-          sequenceRef.current,
+          snapshot.people,
+          snapshot.controller,
           setVideoProgress,
         );
         setNotice(
@@ -96,8 +99,8 @@ export function useRadarExports({ ready, busy, exporting, exportingVideo, isVide
       if (!pa) throw new Error('请先选择选手。');
       const result = await exportDynamicVideo(
         view === 'performance' ? '选手比赛表现' : 'HLTV 选手属性',
-        { name: pa.name, context: context(a) },
-        comp && pb ? { name: pb.name, context: context(b) } : undefined,
+        { name: pa.name, context: context(a), color: primaryColor },
+        comp && pb ? { name: pb.name, context: context(b), color: secondaryColor } : undefined,
         setVideoProgress,
       );
       setNotice(
@@ -106,7 +109,8 @@ export function useRadarExports({ ready, busy, exporting, exportingVideo, isVide
     } catch (e) {
       setNotice(e instanceof Error ? e.message : '视频导出失败，请重试。');
     } finally {
-      videoExportLock.current = false;
+      if (isVideo) releaseSequenceExport();
+      exportLock.current = false;
       setExportingVideo(false);
       setVideoProgress(0);
     }

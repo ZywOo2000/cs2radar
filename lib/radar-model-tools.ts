@@ -22,10 +22,14 @@ export type RadarToolState = {
   view: string;
   actions: Actions;
   setMode: (mode: string) => void;
+  canMutate?: () => boolean;
 };
 
 // Read through a getter so a registered tool never holds a stale render's state.
 export function createRadarTools(current: () => RadarToolState): RadarTool[] {
+  const requireEditable = () => {
+    if (current().canMutate?.() === false) throw new Error('正在导出，请等待导出完成后再修改数据。');
+  };
   const read = () => {
     const { mode, view, workspace, store } = current();
     const comparison = manualComparisonState(workspace);
@@ -56,6 +60,7 @@ export function createRadarTools(current: () => RadarToolState): RadarTool[] {
         const x = input as { slot?: string; url?: string };
         if (!x || !['A', 'B', 'C', 'D', 'E'].includes(x.slot || '') || typeof x.url !== 'string')
           throw new Error('需要 slot A–E 与 url。');
+        requireEditable();
         await current().actions.load('ABCDE'.indexOf(x.slot!), x.url);
         return read();
       },
@@ -70,8 +75,10 @@ export function createRadarTools(current: () => RadarToolState): RadarTool[] {
         if (!x || !['A', 'B', 'C', 'D', 'E'].includes(x.slot || '') || typeof x.playerId !== 'string' ||
             (x.mode && !['single', 'compare', 'video', 'manual'].includes(x.mode)))
           throw new Error('选择参数无效。');
+        requireEditable();
         await current().actions.choose('ABCDE'.indexOf(x.slot!), x.playerId, x.scopeId);
         if (x.mode) {
+          requireEditable();
           // React may not commit until after this call returns; report the new mode immediately.
           current().mode = x.mode;
           current().setMode(x.mode);

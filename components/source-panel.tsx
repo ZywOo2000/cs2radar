@@ -69,13 +69,15 @@ export function ColorEditor({
   side,
   color,
   onChange,
+  disabled = false,
 }: {
   side: Side;
   color: string;
   onChange: (color: string) => void;
+  disabled?: boolean;
 }) {
   return (
-    <fieldset className="color-editor">
+    <fieldset className="color-editor" disabled={disabled}>
       <legend>数据图颜色</legend>
       <div
         className="color-presets"
@@ -124,6 +126,7 @@ export function SourcePanel({
   clear,
   copy,
   cancel,
+  disabled = false,
 }: {
   side: Side;
   slot: Slot;
@@ -137,6 +140,7 @@ export function SourcePanel({
   clear: () => void;
   copy?: () => void;
   cancel: () => void;
+  disabled?: boolean;
 }) {
   const p = player(slot),
     st = stats(slot);
@@ -154,7 +158,7 @@ export function SourcePanel({
             className="icon-button panel-clear"
             aria-label={'清空数据 ' + side.toUpperCase()}
             onClick={clear}
-            disabled={slot.busy}
+            disabled={disabled || slot.busy}
           >
             <X size={16} />
           </button>
@@ -180,13 +184,13 @@ export function SourcePanel({
             value={slot.url}
             onChange={(e) => edit(e.target.value)}
             placeholder="https://www.hltv.org/..."
-            disabled={slot.busy}
+            disabled={disabled || slot.busy}
           />
         </div>
         <button
           className="button primary full"
           type="submit"
-          disabled={!slot.url.trim() || slot.busy}
+          disabled={disabled || !slot.url.trim() || slot.busy}
         >
           {slot.busy ? (
             <>
@@ -203,7 +207,7 @@ export function SourcePanel({
       {slot.busy && (
         <output className="import-progress">
           <p>{slot.progress || '正在读取统计数据…'}</p>
-          <button className="text-button" onClick={cancel}>
+          <button className="text-button" disabled={disabled} onClick={cancel}>
             取消读取
           </button>
         </output>
@@ -238,7 +242,7 @@ export function SourcePanel({
               label: x.name + ' · ' + x.team,
             }))}
             onChange={(v) => choose(v)}
-            disabled={slot.busy}
+            disabled={disabled || slot.busy}
           />
           <Picker
             label="统计范围"
@@ -249,7 +253,7 @@ export function SourcePanel({
               label: x.name,
             }))}
             onChange={(v) => choose(p.id, v)}
-            disabled={slot.busy}
+            disabled={disabled || slot.busy}
           />
           <div className="player-identity">
             <div className="player-monogram">
@@ -293,7 +297,7 @@ export function SourcePanel({
               })}
             </p>
           )}
-          <ColorEditor side={side} color={color} onChange={setColor} />
+          <ColorEditor side={side} color={color} onChange={setColor} disabled={disabled} />
           <fieldset className="best-editor">
             <legend>Best 标记</legend>
             <p>选择要在数据图中强调的数值</p>
@@ -307,7 +311,7 @@ export function SourcePanel({
                     type="button"
                     aria-pressed={active}
                     data-active={active || undefined}
-                    disabled={!available || slot.busy}
+                    disabled={disabled || !available || slot.busy}
                     onClick={() => toggleBest(m.key)}
                   >
                     {m.name}
@@ -327,7 +331,7 @@ export function SourcePanel({
               : '可独立导入来源，也可复制上一份来源后快速换选手。'}
           </p>
           {copy && (
-            <button className="text-button" onClick={copy} disabled={slot.busy}>
+            <button className="text-button" onClick={copy} disabled={disabled || slot.busy}>
               <Copy size={14} />
               复制上一份数据来源
             </button>

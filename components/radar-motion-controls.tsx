@@ -24,8 +24,8 @@ export function useRadarMotion(dataKey=''){
  return {...state,revealId,showStatic,playDynamic};
 }
 
-export function RadarModeControls({mode,onStatic,onDynamic}:{mode:'static'|'dynamic';onStatic:()=>void;onDynamic:()=>void}){
- return <fieldset className="radar-mode-switch">
+export function RadarModeControls({mode,onStatic,onDynamic,disabled=false}:{mode:'static'|'dynamic';onStatic:()=>void;onDynamic:()=>void;disabled?:boolean}){
+ return <fieldset className="radar-mode-switch" disabled={disabled}>
   <legend className="radar-mode-legend">数据图展示模式</legend>
   <button type="button" className="radar-mode-button" data-active={mode==='static'||undefined} aria-pressed={mode==='static'} onClick={onStatic}>静态</button>
   <button type="button" className="radar-mode-button" data-active={mode==='dynamic'||undefined} aria-pressed={mode==='dynamic'} onClick={onDynamic}>动态</button>

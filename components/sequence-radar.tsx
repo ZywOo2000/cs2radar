@@ -32,6 +32,7 @@ export type SequenceRadarHandle = {
     motion: RadarMotionKind,
   ) => Promise<SequenceFrame>;
   getSvg: () => SVGSVGElement | null;
+  isPrepared?: () => boolean;
 };
 
 export const SequenceRadar = forwardRef<
@@ -41,18 +42,19 @@ export const SequenceRadar = forwardRef<
     metrics: Metric[];
     onPlaying?: (value: boolean) => void;
     hideMissingExtras?: boolean;
+    drawKeys?: string[];
   }
->(function SequenceRadar({ people, metrics, onPlaying, hideMissingExtras = false }, ref) {
+>(function SequenceRadar({ people, metrics, onPlaying, hideMissingExtras = false, drawKeys }, ref) {
   const timelineMetrics = useMemo(() => {
     const extras = metrics.some((m) => m.key === 'multiKillPct')
       ? performanceMetrics.filter(
           (m) =>
             ['firepower', 'swing'].includes(m.key) &&
-            people.every((p) => Number.isFinite(p.stats[m.key])),
+            people.some((p) => Number.isFinite(p.stats[m.key])),
         )
       : [];
-    return [...metrics, ...extras];
-  }, [metrics, people]);
+    return [...metrics.filter(m => !drawKeys || drawKeys.includes(m.key)), ...extras];
+  }, [metrics, people, drawKeys]);
   const initial = useMemo(
     () =>
       sequenceFrameAt(
@@ -167,6 +169,7 @@ export const SequenceRadar = forwardRef<
     renderAt,
     getSvg: () =>
       host.current?.querySelector<SVGSVGElement>('#performance-radar') || null,
+    isPrepared: () => host.current?.getAttribute('data-prepared') === 'true',
   }));
   const from = people[frame.fromIndex] || people[0],
     to = people[frame.toIndex] || from;
@@ -204,13 +207,14 @@ export const SequenceRadar = forwardRef<
           metrics={metrics}
           a={frame.stats}
           nameA={to?.name || from?.name || '视频序列'}
-          drawKeys={metrics.map((m) => m.key)}
+          drawKeys={drawKeys || metrics.map((m) => m.key)}
           bestA={frame.bestKeys}
           colorA={frame.color}
           dataKey="sequence-controlled-static"
           showControls={false}
-          hideMissingExtras={hideMissingExtras}
+          hideMissingExtras={hideMissingExtras || timelineMetrics.some(m => m.key === 'swing' || m.key === 'firepower')}
           bestOpacity={frame.bestOpacity}
+          metricOpacity={frame.metricOpacity}
         />
       </div>
     </div>

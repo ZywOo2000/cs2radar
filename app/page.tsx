@@ -40,12 +40,14 @@ import {
   type Dataset,
 } from '@/lib/stats';
 import { useRadarExports } from '@/hooks/use-radar-exports';
+import { useSequenceExportSnapshot } from '@/hooks/use-sequence-export-snapshot';
 import {
   SequenceRadar,
   type SequenceRadarHandle,
 } from '@/components/sequence-radar';
 import {
   commonSequenceMetrics,
+  renderableSequenceMetrics,
   type SequenceParticipant,
 } from '@/lib/video-sequence';
 import { useHltvExtension } from '@/lib/extension-client';
@@ -84,11 +86,10 @@ export default function Home() {
   const manualDataA = useMemo(() => manualDataset(manual.workspace.drafts.A, 'A', manualCompare), [manual.workspace.drafts.A, manualCompare]);
   const manualDataB = useMemo(() => manualDataset(manual.workspace.drafts.B, 'B', manualCompare), [manual.workspace.drafts.B, manualCompare]);
   const [transport, setTransport] = useState<Transport>('auto');
-  const videoExportLock = useRef(false);
+  const exportLock = useRef(false);
   const sequenceRef = useRef<SequenceRadarHandle>(null);
   const { slots, store } = useSlots();
-  const { update, cancel, copySource, toggleBest } = store;
-  const clear = (i: number) => store.reset(i);
+
   const [seriesColors, setSeriesColors] = useState<string[]>([
     ...DEFAULT_SERIES_COLORS,
   ]);
@@ -100,6 +101,13 @@ export default function Home() {
     [exportingVideo, setExportingVideo] = useState(false),
     [videoProgress, setVideoProgress] = useState(0),
     [notice, setNotice] = useState('');
+  const editingLocked = exporting || exportingVideo;
+  const canMutate = () => !exportLock.current && !editingLocked;
+  const { cancel } = store;
+  const update = (i: number, patch: Partial<Slot>) => { if (canMutate()) store.update(i, patch); };
+  const copySource = (i: number) => { if (canMutate()) store.copySource(i); };
+  const toggleBest = (i: number, key: string) => { if (canMutate()) store.toggleBest(i, key); };
+  const clear = (i: number) => { if (canMutate()) store.reset(i); };
   const isManual = mode === 'manual';
   const arenaActive = !isManual && (mode === 'video'
     ? slots.some(slot => slot.data?.origin?.type === 'local-arena')
@@ -131,9 +139,11 @@ export default function Home() {
     return body.data;
   }
   function choose(i: number, id: string, scope?: string) {
+    if (!canMutate()) throw new Error('正在导出，请等待完成后再修改数据。');
     return store.choose(i, id, scope, fetchData);
   }
   async function load(i: number, url = store.getSnapshot()[i].url) {
+    if (!canMutate()) throw new Error('正在导出，请等待完成后再修改数据。');
     const via =
       transport === 'auto'
         ? extension.connected
@@ -145,6 +155,7 @@ export default function Home() {
     return result;
   }
   function setSeriesColor(i: number, color: string) {
+    if (!canMutate()) return;
     setSeriesColors((current) => {
       const next = [...current];
       next[i] = color;
@@ -155,10 +166,12 @@ export default function Home() {
     });
   }
   function showDemo() {
+    if (!canMutate()) return;
     store.showDemo(demo);
     setNotice('当前展示虚构示例。粘贴真实 HLTV 链接可替换任一侧。');
   }
   function moveSlot(i: number, direction: -1 | 1) {
+    if (!canMutate()) return;
     const j = i + direction;
     if (j < 0 || j > 4) return;
     if (!store.swap(i, j)) return;
@@ -233,6 +246,13 @@ export default function Home() {
     () => commonSequenceMetrics(ms, videoPeople),
     [ms, videoPeople],
   );
+  const sequenceDrawKeys = useMemo(
+    () => renderableSequenceMetrics(ms, videoPeople).map(m => m.key),
+    [ms, videoPeople],
+  );
+  const { createSequenceExport, releaseSequenceExport, renderer: sequenceExportRenderer } = useSequenceExportSnapshot(
+    videoPeople, view === 'performance' ? ms : sequenceComparable, sequenceDrawKeys, arenaActive,
+  );
   const sequenceReady =
     videoPeople.length >= 2 && sequenceComparable.length >= 3;
   const ready = isManual
@@ -286,12 +306,13 @@ export default function Home() {
   const manualRatingVersionNotice = isManual && ratingVersionMismatch &&
     Number.isFinite(sa.rating) && Number.isFinite(sb.rating);
   const { localDataset, importArena, compareArena, videoArena } = useArenaSources({
-    store, slots, busy, sequencePlaying, exporting, exportingVideo, videoExportLock,
+    store, slots, busy, sequencePlaying, exporting, exportingVideo, exportLock,
     setMode, setView, setActiveSlot, setNotice,
   });
   const { download, downloadVideo } = useRadarExports({ ready, busy, exporting, exportingVideo, isVideo,
     sequenceReady, isManual, arenaActive, comp, view, ms, comparable, a, b, pa, pb, sa, sb,
-    primaryColor, secondaryColor, videoPeople, sequenceRef, videoExportLock,
+    primaryColor, secondaryColor, createSequenceExport, releaseSequenceExport,
+    isSourceBusy: () => !isManual && store.getSnapshot().some(slot => slot.busy), exportLock,
     setExporting, setExportingVideo, setVideoProgress, setNotice });
   useEffect(() => {
     try {
@@ -308,7 +329,7 @@ export default function Home() {
       }
     } catch {}
   }, []);
-  useRadarModelTools({ store, workspace: manual.workspace, mode, view, actions: { load, choose }, setMode });
+  useRadarModelTools({ store, workspace: manual.workspace, mode, view, actions: { load, choose }, setMode, canMutate });
   return (
     <TooltipProvider>
       <main className="site-shell">
@@ -357,7 +378,7 @@ export default function Home() {
               className="button secondary"
               hidden={isManual}
               onClick={showDemo}
-              disabled={busy || exportingVideo}
+              disabled={busy || editingLocked}
             >
               <RotateCcw size={15} />
               查看示例
@@ -425,7 +446,7 @@ export default function Home() {
                 { value: 'server', label: '仅服务器' },
               ]}
               onChange={(v) => setTransport(v as Transport)}
-              disabled={busy}
+              disabled={busy || editingLocked}
             />
             <ExtensionGuide connected={extension.connected} />
           </div>
@@ -434,20 +455,20 @@ export default function Home() {
           <Tabs
             value={mode}
             onValueChange={(v) => {
-              if (exporting || exportingVideo) return;
+              if (!canMutate()) return;
               const nextMode = String(v);
               setMode(nextMode);
               setActiveSlot(nextMode === 'video' ? 0 : Math.min(activeSlot, 1));
             }}
           >
             <TabsList className="mode-tabs">
-              <TabsTrigger value="compare">
+              <TabsTrigger value="compare" disabled={editingLocked}>
                 <ArrowLeftRight size={15} />
                 双人对比
               </TabsTrigger>
-              <TabsTrigger value="single">单人展示</TabsTrigger>
-              <TabsTrigger value="manual">手动填写</TabsTrigger>
-              <TabsTrigger value="video">
+              <TabsTrigger value="single" disabled={editingLocked}>单人展示</TabsTrigger>
+              <TabsTrigger value="manual" disabled={editingLocked}>手动填写</TabsTrigger>
+              <TabsTrigger value="video" disabled={editingLocked}>
                 <Video size={15} />
                 视频模式
               </TabsTrigger>
@@ -471,6 +492,7 @@ export default function Home() {
           currentPlayerId={localDataset && slots[0].data?.id === localDataset.id ? slots[0].playerId : localDataset ? arenaPlayerId(localDataset) : ''}
           disabled={busy || exporting || exportingVideo || sequencePlaying}
           onImport={importArena} onCompare={compareArena} onVideo={videoArena} />
+        {sequenceExportRenderer}
         {notice && (
           <output className="notice">
             <Info size={15} />
@@ -508,6 +530,7 @@ export default function Home() {
                         className="sequence-row-main"
                         type="button"
                         onClick={() => setActiveSlot(i)}
+                        disabled={editingLocked}
                       >
                         <span
                           className="slot-badge"
@@ -528,7 +551,7 @@ export default function Home() {
                         <button
                           className="icon-button"
                           aria-label="上移"
-                          disabled={i === 0 || busy}
+                          disabled={i === 0 || busy || editingLocked}
                           onClick={() => moveSlot(i, -1)}
                         >
                           <ChevronUp size={15} />
@@ -536,7 +559,7 @@ export default function Home() {
                         <button
                           className="icon-button"
                           aria-label="下移"
-                          disabled={i === 4 || busy}
+                          disabled={i === 4 || busy || editingLocked}
                           onClick={() => moveSlot(i, 1)}
                         >
                           <ChevronDown size={15} />
@@ -553,6 +576,7 @@ export default function Home() {
                 return (
                   <div className="video-slot active-video-slot">
                     <SourcePanel
+                      disabled={editingLocked}
                       side={side}
                       slot={slot}
                       color={seriesColors[i]}
@@ -592,12 +616,12 @@ export default function Home() {
               </div>
               {!arenaActive && <Tabs
                 value={view}
-                onValueChange={(v) => setView(String(v))}
+                onValueChange={(v) => { if (canMutate()) setView(String(v)); }}
                 className="chart-tabs"
               >
                 <TabsList className="metric-tabs">
-                  <TabsTrigger value="performance">比赛指标</TabsTrigger>
-                  <TabsTrigger value="attributes">HLTV 属性</TabsTrigger>
+                  <TabsTrigger value="performance" disabled={editingLocked}>比赛指标</TabsTrigger>
+                  <TabsTrigger value="attributes" disabled={editingLocked}>HLTV 属性</TabsTrigger>
                 </TabsList>
               </Tabs>}
               <div className="sequence-preview-actions">
@@ -630,6 +654,7 @@ export default function Home() {
                     people={videoPeople}
                     hideMissingExtras={!!arenaActive}
                     metrics={view === 'performance' ? ms : sequenceComparable}
+                    drawKeys={sequenceDrawKeys}
                     onPlaying={setSequencePlaying}
                   />
                 ) : (
@@ -732,6 +757,7 @@ export default function Home() {
                   />
                 ) : !comp || activeSlot === 0 ? (
                   <SourcePanel
+                    disabled={editingLocked}
                     side="a"
                     slot={a}
                     color={primaryColor}
@@ -746,6 +772,7 @@ export default function Home() {
                   />
                 ) : (
                   <SourcePanel
+                    disabled={editingLocked}
                     side="b"
                     slot={b}
                     color={seriesColors[1]}
@@ -784,12 +811,12 @@ export default function Home() {
                 {!isManual && !arenaActive && (
                   <Tabs
                     value={view}
-                    onValueChange={(v) => setView(String(v))}
+                    onValueChange={(v) => { if (canMutate()) setView(String(v)); }}
                     className="chart-tabs"
                   >
                     <TabsList className="metric-tabs">
-                      <TabsTrigger value="performance">比赛指标</TabsTrigger>
-                      <TabsTrigger value="attributes">HLTV 属性</TabsTrigger>
+                      <TabsTrigger value="performance" disabled={editingLocked}>比赛指标</TabsTrigger>
+                      <TabsTrigger value="attributes" disabled={editingLocked}>HLTV 属性</TabsTrigger>
                     </TabsList>
                   </Tabs>
                 )}
@@ -805,6 +832,7 @@ export default function Home() {
                     nameB={pb?.name || '数据 B'}
                     drawKeys={comparable.map((m) => m.key)}
                     hideMissingExtras={isManual || arenaActive}
+                    disabled={editingLocked}
                     bestA={a.bestKeys}
                     bestB={b.bestKeys}
                     colorA={primaryColor}

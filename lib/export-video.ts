@@ -7,16 +7,18 @@ import {
 } from './radar-motion';
 import {
   bestRevealOpacity,
+  createVideoRecorder,
   interpolatePolygonPoints,
   supportedVideoMime,
   videoCanvasSize,
   videoFileName,
   videoFrameGeometry,
 } from './export-video-utils';
-import { applyRadarViewBox, copyRadarTextBounds } from './radar-bounds';
+import { applyRadarViewBox } from './radar-bounds';
+import { finalRadarSnapshot } from './radar-snapshot';
 import { freezeVideoFrame, holdFinalVideoFrame } from './video-final-hold';
 
-export type ExportSide = { name: string; context: string };
+export type ExportSide = { name: string; context: string; color?: string };
 export type VideoExportResult = {
   format: 'MP4' | 'WebM';
   fileName: string;
@@ -63,7 +65,7 @@ async function drawSvg(
   }
 }
 
-function videoFrame(
+export function videoFrame(
   clone: SVGSVGElement,
   graphWidth: number,
   graphHeight: number,
@@ -78,6 +80,8 @@ function videoFrame(
     scale,
     graphX,
   } = videoFrameGeometry(graphWidth, graphHeight);
+  const canvasSize = videoCanvasSize(outerWidth, totalHeight);
+  const reduced = canvasSize.width < outerWidth * 0.9 || canvasSize.height < totalHeight * 0.9;
   const xml = new XMLSerializer().serializeToString(clone);
   const text = (
     x: number,
@@ -87,21 +91,21 @@ function videoFrame(
     color: string,
     weight = 400,
   ) =>
-    `<text x="${x}" y="${y}" fill="${color}" font-family="Arial, Microsoft YaHei, sans-serif" font-size="${size}" font-weight="${weight}">${escape(value)}</text>`;
+    `<text x="${x}" y="${y}" fill="${escape(color)}" font-family="Arial, Microsoft YaHei, sans-serif" font-size="${size}" font-weight="${weight}">${escape(value)}</text>`;
   const legendB = b
     ? text(
         600,
         133,
         `B · ${b.name} · ${b.context}`.slice(0, 82),
         17,
-        '#61dac8',
+        b.color || '#61dac8',
         600,
       )
     : '';
   return {
     width: outerWidth,
     height: totalHeight,
-    svg: `<svg xmlns="${NS}" width="${outerWidth}" height="${totalHeight}" viewBox="0 0 ${outerWidth} ${totalHeight}"><rect width="${outerWidth}" height="${totalHeight}" fill="#151e28"/>${text(50, 48, 'RADAR / CS2', 20, '#bddbff', 600)}${text(50, 91, title, 31, '#eef4fb', 600)}${text(50, 133, `A · ${a.name} · ${a.context}`.slice(0, 82), 17, '#bddbff', 600)}${legendB}<g transform="translate(${graphX} ${header}) scale(${scale})">${xml}</g></svg>`,
+    svg: `<svg xmlns="${NS}" width="${reduced ? canvasSize.width : outerWidth}" height="${reduced ? canvasSize.height : totalHeight}" viewBox="0 0 ${outerWidth} ${totalHeight}"><rect width="${outerWidth}" height="${totalHeight}" fill="#151e28"/>${text(50, 48, 'RADAR / CS2', 20, '#bddbff', 600)}${text(50, 91, title, 31, '#eef4fb', 600)}${text(50, 133, `A · ${a.name} · ${a.context}`.slice(0, 82), 17, a.color || '#bddbff', 600)}${legendB}<g transform="translate(${graphX} ${header}) scale(${scale})">${xml}</g></svg>`,
   };
 }
 
@@ -118,7 +122,7 @@ export async function exportDynamicVideo(
     typeof HTMLCanvasElement.prototype.captureStream !== 'function'
   )
     throw new Error('当前浏览器不支持视频导出，请使用最新版 Chrome 或 Edge。');
-  const mime = supportedVideoMime((type) =>
+  let mime = supportedVideoMime((type) =>
     MediaRecorder.isTypeSupported(type),
   );
   if (!mime)
@@ -126,33 +130,7 @@ export async function exportDynamicVideo(
       '当前浏览器没有可用的视频编码器，请使用最新版 Chrome 或 Edge。',
     );
 
-  const clone = live.cloneNode(true) as SVGSVGElement;
-  copyRadarTextBounds(live, clone);
-  clone.querySelectorAll<SVGAnimateElement>('animate').forEach((animation) => {
-    const attribute = animation.getAttribute('attributeName'),
-      target = animation.getAttribute('to');
-    if (attribute && target)
-      animation.parentElement?.setAttribute(attribute, target);
-    animation.remove();
-  });
-  clone
-    .querySelectorAll(
-      '.radar-motion-center,.radar-motion-rings,.radar-motion-bar,.radar-best-motion',
-    )
-    .forEach((node) =>
-      node.classList.remove(
-        'radar-motion-center',
-        'radar-motion-rings',
-        'radar-motion-bar',
-        'radar-best-motion',
-        'radar-best-center',
-        'radar-best-rings',
-      ),
-    );
-  clone.removeAttribute('class');
-  clone.removeAttribute('data-display-mode');
-  clone.removeAttribute('data-motion-kind');
-  clone.removeAttribute('data-motion-run');
+  const clone = finalRadarSnapshot(live);
   const center = {
     x: Number(clone.getAttribute('data-radar-center-x') || 300),
     y: Number(clone.getAttribute('data-radar-center-y') || 244),
@@ -323,10 +301,7 @@ export async function exportDynamicVideo(
   const chunks: Blob[] = [];
   let recorder: MediaRecorder;
   try {
-    recorder = new MediaRecorder(stream, {
-      mimeType: mime,
-      videoBitsPerSecond: 8_000_000,
-    });
+    ({recorder, mime} = createVideoRecorder(stream));
   } catch {
     stream.getTracks().forEach((track) => track.stop());
     throw new Error('视频编码器启动失败，请更新浏览器后重试。');

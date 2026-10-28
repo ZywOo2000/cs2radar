@@ -138,7 +138,7 @@ export function mergeMatchDataset(data:Dataset,detail:Dataset,scope:string,paren
  return count;
 }
 export function parseEvent(html:string,u:URL,title?:string):Dataset{
- const $=load(html),out=base($,u,'event');if(title)out.title=title;out.event=title||out.event||'赛事 '+u.searchParams.get('event');out.scopes=[{id:'event',name:'整届赛事'}];
+ const $=load(html),out=base($,u,'event');if(title)out.title=title;const eventId=u.searchParams.get('event');out.event=title||out.event||(eventId?'赛事 '+eventId:'');out.scopes=[{id:'event',name:playerScopeName(u)}];
  const table=$('.player-ratings-table,.stats-table').filter((_,el)=>$(el).find('.playerCol').length>0).first();
  const headers=table.find('tr').first().find('th,td').toArray().map(x=>txt($(x).text()));
  table.find('tbody tr').each((_,el)=>{
@@ -149,7 +149,7 @@ export function parseEvent(html:string,u:URL,title?:string):Dataset{
   out.players.push({id,name:txt(a.text()),team:r.find('.teamCol img').toArray().map(x=>$(x).attr('title')).filter(Boolean).join(' / ')||txt(r.find('.teamCol').text())||'战队未提供',profileUrl:safeLink(pu.href,u),ratingVersion:version(headers.join(' ')),stats:{event:derive(stats)}});
  });
  if(!out.players.length)throw new ImportError('NO_STATS','该赛事没有可识别的选手统计，或 HLTV 页面结构已变化。');
- out.notes=['选择选手后会继续读取其赛事详情；详情读取失败时保留已取得的赛事列表数据。'];return out;
+ out.notes=['选择选手后会继续读取其统计详情；详情读取失败时保留已取得的列表数据。'];return out;
 }
 export function parsePlayer(html:string,u:URL):Dataset{
  const $=load(html),out=base($,u,'player'),stats:Stats={};

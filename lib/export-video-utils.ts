@@ -1,7 +1,20 @@
-export const supportedVideoMime=(supports:(mime:string)=>boolean)=>[
+import { boundedCanvasSize } from './canvas-limits';
+
+export const VIDEO_MIME_TYPES=[
  'video/mp4;codecs=avc1.42E01E','video/mp4;codecs=avc1.42001E','video/mp4',
  'video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'
-].find(supports)||'';
+];
+export const supportedVideoMime=(supports:(mime:string)=>boolean)=>VIDEO_MIME_TYPES.find(supports)||'';
+
+// A browser may claim support yet refuse to initialize a particular encoder.
+// Keep trying the advertised choices, with all MP4 candidates before WebM.
+export function createVideoRecorder(stream:MediaStream, Recorder:typeof MediaRecorder=MediaRecorder){
+ for(const mime of VIDEO_MIME_TYPES){
+  if(!Recorder.isTypeSupported(mime))continue;
+  try{return {recorder:new Recorder(stream,{mimeType:mime,videoBitsPerSecond:8_000_000}),mime}}catch{}
+ }
+ throw new Error('视频编码器启动失败，请更新浏览器后重试。');
+}
 
 export const videoFileName=(comparison:boolean,date=new Date(),extension='webm')=>{
  const pad=(n:number)=>String(n).padStart(2,'0');
@@ -30,6 +43,5 @@ export const videoFrameGeometry=(graphWidth:number,graphHeight:number)=>{
 
 export const videoCanvasSize=(frameWidth:number,frameHeight:number)=>{
  const pixelScale=1080/1200;
- const even=(value:number)=>Math.ceil(value/2)*2;
- return {width:even(frameWidth*pixelScale),height:even(frameHeight*pixelScale)};
+ return boundedCanvasSize(frameWidth*pixelScale,frameHeight*pixelScale,true);
 };
