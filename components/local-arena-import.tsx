@@ -32,8 +32,8 @@ export function LocalArenaImport({ dataset, currentPlayerId, disabled, onImport,
     setSelection([self.id, ...teammates.map(p => p.id)].slice(0, 5));
   }, [dataset]);
   const locked = disabled || reading;
-  return <section className="arena-import" aria-label="Local Arena 本地对局导入">
-    <div className="arena-import-heading"><div><strong>Local Arena 本地对局</strong><p>从软件一键生成，或导入 .radar.json 文件。无需扩展。</p></div>
+  return <section className="arena-import" aria-label="Local Arena 本地对局导入" hidden={!dataset && !reading && !message} aria-busy={reading}>
+    <div className="arena-import-heading" hidden><div><strong>Local Arena 本地对局</strong><p>从软件一键生成，或导入 .radar.json 文件。无需扩展。</p></div>
       <label className="button secondary arena-file-button" aria-disabled={locked}>
         {reading ? '正在读取…' : '导入本地对局'}
         <input type="file" accept=".json,.radar.json,application/json" disabled={locked} onChange={event => {
@@ -45,7 +45,7 @@ export function LocalArenaImport({ dataset, currentPlayerId, disabled, onImport,
         }} />
       </label>
     </div>
-    {message && <output role="status" className="arena-message">{message}</output>}
+    {(reading || message) && <output role="status" className="arena-message">{reading ? '正在读取本地对局…' : message}</output>}
     {dataset && <details className="arena-roster" open>
       <summary>{dataset.title} · {dataset.players.length} 位选手</summary>
       <p className="muted small">本机离线统计 · Rating 使用 Local Arena 自定义模型</p>

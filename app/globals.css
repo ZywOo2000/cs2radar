@@ -2547,6 +2547,7 @@ body::before {
 
 /* Local Arena summary import; keep chart geometry in the existing stage. */
 .arena-import{margin:16px 0;padding:16px;border:1px solid #293946;background:#0b1219;color:#dce8f3;border-radius:5px}
+.arena-import[hidden],.arena-import-heading[hidden]{display:none}
 .arena-import-heading{display:flex;gap:16px;justify-content:space-between;align-items:center}.arena-import-heading p{margin:5px 0 0;font-size:12px;color:#91a6b5}
 .arena-file-button{cursor:pointer;position:relative}.arena-file-button:focus-within{outline:2px solid #ff8d4a;outline-offset:3px}.arena-file-button[aria-disabled=true]{opacity:.5;cursor:wait}
 .arena-file-button input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:inherit}
