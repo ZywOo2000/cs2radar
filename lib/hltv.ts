@@ -62,6 +62,39 @@ function playerScopeName(u:URL){
  return '全部历史';
 }
 function safeLink(path:string|undefined,baseUrl:URL){if(!path)return undefined;try{return sourceUrl(new URL(path,baseUrl).href).href}catch{return undefined}}
+
+function playerSummaryRating($:CheerioAPI):{value:number;version:string}|undefined{
+ const ignored='table,nav,footer,script,style,[hidden],[aria-hidden="true"],.player-summary-tooltip,.hiddenTooltip,.tooltip,[role="tooltip"],.ecoAdjustedData,[data-eco-adjusted="true"],.ctstats,.tstats,.stats-side-ct,.stats-side-t';
+ const ratingLabel=/^rating\s*(?:[123]\.\d+)?$/i;
+ // A gauge can put the score inside several wrappers rather than beside its
+ // label. Search only that label's nearest unambiguous container. In particular,
+ // never climb into the shared T / overall / CT row or read a version as a score.
+ for(const el of $('span,div,text').toArray()){
+  const node=$(el);if(node.closest(ignored).length)continue;
+  if(!/^rating(?:\s|[123]|$)/i.test(txt(node.text())))continue;
+  if(node.parents('[data-side]').addBack('[data-side]').toArray().some(x=>!/^(all|both|combined)$/i.test($(x).attr('data-side')||'')))continue;
+  const caption=node.clone();caption.find(ignored).remove();
+  const raw=txt(caption.text());if(!ratingLabel.test(raw))continue;
+  // Keep the innermost complete label; its version can itself be a nested span.
+  if(caption.find('span,div,text').toArray().some(x=>ratingLabel.test(txt($(x).text()))))continue;
+  let region=node.parent();
+  for(let depth=0;depth<4&&region.length&&!region.is('body,html');depth++,region=region.parent()){
+   const scope=region.clone();scope.find(ignored).remove();
+   scope.find('[data-side]').filter((_,x)=>!/^(all|both|combined)$/i.test($(x).attr('data-side')||'')).remove();
+   const labels=scope.find('span,div,text');
+   if(labels.toArray().some(x=>{
+    const text=txt($(x).text()),key=keyFor(text);
+    return /^(?:T|CT)\s*rating$/i.test(text)||(key&&key!=='rating');
+   }))break;
+   labels.filter((_,x)=>ratingLabel.test(txt($(x).text()))).remove();
+   const values=scope.find('*').filter((_,x)=>!$(x).children().length&&/^\d+(?:\.\d+)?$/.test(txt($(x).text()))).toArray();
+   if(values.length>1)break;
+   if(values.length===1){const value=number($(values[0]).text());if(value!==undefined)return {value,version:version(raw)};break}
+  }
+ }
+ return undefined;
+}
+
 export function parseMatch(html:string,u:URL):Dataset{
  const $=load(html),out=base($,u,'match');
  const maps=$('.mapholder').toArray().map(el=>{const m=$(el),scores=m.find('.results-team-score').toArray().map(x=>number($(x).text()));const url=m.find('.results-stats a,a.results-stats,.results-stats').attr('href');return {name:txt(m.find('.mapname').text()),statsId:url?.match(/mapstatsid\/(\d+)/)?.[1],rounds:scores.length===2&&scores.every(x=>x!==undefined)?scores[0]!+scores[1]!:undefined}});
@@ -185,15 +218,16 @@ export function parsePlayer(html:string,u:URL):Dataset{
  // Restrict to leaf labels outside tables and skip side-specific / eco-adjusted containers.
  $('span,div').each((_,el)=>{
   const node=$(el);if(node.closest('table,nav,footer,script,[hidden],[aria-hidden="true"]').length)return;
-  const raw=txt(node.text());if(raw.length>32)return;const k=keyFor(raw);if(!k||stats[k]!==undefined)return;
+  const raw=txt(node.text());if(raw.length>32)return;const k=keyFor(raw);if(!k||k==='rating'||stats[k]!==undefined)return;
   const ancestry=node.parents('[data-side],.ctstats,.tstats,[data-eco-adjusted="true"]');
   if(ancestry.toArray().some(x=>{const side=$(x).attr('data-side');return side?!/^(all|both)$/i.test(side):true}))return;
   const siblings=[node.next(),node.prev(),node.parent().next(),node.parent().prev()];let val:number|undefined;
   for(const sibling of siblings){const text=txt(sibling.text());if(k==='multiKillPct'&&!text.includes('%'))continue;if(/^[+−-]?\d+(?:\.\d+)?\s*%?(?:\s*\/\s*100)?$/.test(text)){val=number(text);break}}
   if(val===undefined)return;
   if(['firepower','entrying','trading','opening','clutching','sniping','utility'].includes(k)&&(val<0||val>100))return;
-  stats[k]=val;if(k==='rating')v=version(raw);
+  stats[k]=val;
  });
+ if(stats.rating===undefined){const rating=playerSummaryRating($);if(rating){stats.rating=rating.value;v=rating.version}}
  derive(stats);if(Object.keys(stats).length<2)throw new ImportError('NO_STATS','选手页面缺少可识别的统计字段，未导入数据。');
  const scopeName=playerScopeName(u);
  out.scopes=[{id:'event',name:scopeName}];out.players=[{id,name,team:txt($('.SummaryTeamname,.summaryTeamname').first().text())||$('.player-summary-stat-box-left-team-logo').first().attr('title')||'战队未提供',ratingVersion:v,profileUrl:u.href,detailLoaded:true,stats:{event:stats}}];

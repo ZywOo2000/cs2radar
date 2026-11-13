@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {workerScript,extractorScript} from './helpers/extension-bundle.mjs';
-import {parsePlayer,sourceUrl} from '../lib/hltv.ts';
+import {importHltv,parsePlayer,sourceUrl} from '../lib/hltv.ts';
+import {playerRatingPage} from './helpers/player-rating.mjs';
 import {normalized,performance} from '../lib/stats.ts';
 function harness({result,actual,closed=false,sleep=setTimeout,status='complete',tabs=[],clock=Date}={}){
  let onConnect,listener,disconnect,installed=false;const sent=[],created=[],injections=[];
@@ -83,6 +84,19 @@ test('statistics are returned while the tab is still loading advertising resourc
  const h=harness({status:'loading',sleep:()=>{throw Error('Must not wait for tab completion')}});h.connect();
  await h.send({type:'import',id:'ads-still-loading',url:'https://www.hltv.org/matches/2396946/fut-vs-vitality-blast-open-porto-2026'});
  assert.equal(h.sent.at(-1).type,'result');assert.equal(h.sent.at(-1).id,'ads-still-loading');
+});
+
+test('browser extractor and server import agree on the nested overall rating and its event scope',async()=>{
+ const html=playerRatingPage(),url='https://www.hltv.org/stats/players/11893/zywoo?event=8251';
+ const context={URL,Date,atob,document:{title:'ZywOo stats | HLTV.org',readyState:'complete',querySelector:()=>null,documentElement:{outerHTML:html}},location:{href:url}};
+ vm.createContext(context);vm.runInContext(extractorScript,context);
+ const extracted=await context.__cs2RadarExtract();
+ const imported=await importHltv(url,async()=>new Response(html,{headers:{'content-type':'text/html'}}));
+ assert.equal(extracted.status,'success');
+ assert.deepEqual(JSON.parse(JSON.stringify(extracted.data.players)),imported.players);
+ assert.deepEqual(JSON.parse(JSON.stringify(extracted.data.scopes)),imported.scopes);
+ assert.equal(imported.players[0].stats.event.rating,.91);
+ assert.equal(imported.players[0].ratingVersion,'3.0');
 });
 
 test('failed background detail requests fall back to an existing detail tab and fill MKs',async()=>{
