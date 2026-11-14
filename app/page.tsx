@@ -28,6 +28,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   TooltipProvider,
 } from '@/components/ui/tooltip';
+import {useRadarBackground} from '@/hooks/use-radar-background';
+import {RadarBackgroundControls} from '@/components/radar-background-controls';
 import { Radar } from '@/components/radar';
 import { RadarDataTable } from '@/components/radar-data-table';
 import {
@@ -75,6 +77,7 @@ import { LocalArenaImport } from '@/components/local-arena-import';
 import { arenaPlayerId, useArenaSources } from '@/hooks/use-arena-sources';
 import { ARENA_LABEL } from '@/lib/local-arena-protocol';
 export default function Home() {
+  const backgroundSettings=useRadarBackground();
   const extension = useHltvExtension();
   const manual = useManualDraft();
   const [activeManualSide, setActiveManualSide] = useState<ManualSide>('A');
@@ -251,7 +254,7 @@ export default function Home() {
     [ms, videoPeople],
   );
   const { createSequenceExport, releaseSequenceExport, renderer: sequenceExportRenderer } = useSequenceExportSnapshot(
-    videoPeople, view === 'performance' ? ms : sequenceComparable, sequenceDrawKeys, arenaActive,
+    videoPeople, view === 'performance' ? ms : sequenceComparable, sequenceDrawKeys, arenaActive, backgroundSettings.background,
   );
   const sequenceReady =
     videoPeople.length >= 2 && sequenceComparable.length >= 3;
@@ -624,6 +627,7 @@ export default function Home() {
                   <TabsTrigger value="attributes" disabled={editingLocked}>HLTV 属性</TabsTrigger>
                 </TabsList>
               </Tabs>}
+              <RadarBackgroundControls value={backgroundSettings.background} onChange={v=>{if(canMutate())backgroundSettings.setBackground(v)}} disabled={editingLocked} warning={backgroundSettings.warning}/>
               <div className="sequence-preview-actions">
                 <button
                   className="button secondary"
@@ -640,6 +644,7 @@ export default function Home() {
               <div className="chart-wrap">
                 {videoPeople.length ? (
                   <SequenceRadar
+                    background={backgroundSettings.background}
                     key={[
                       view,
                       ...videoPeople.flatMap((p) => [
@@ -823,8 +828,10 @@ export default function Home() {
                 {isManual && (
                   <p className="manual-provenance">{MANUAL_LABEL}</p>
                 )}
+                <RadarBackgroundControls value={backgroundSettings.background} onChange={v=>{if(canMutate())backgroundSettings.setBackground(v)}} disabled={editingLocked} warning={backgroundSettings.warning}/>
                 <div className="chart-wrap">
                   <Radar
+                    background={backgroundSettings.background}
                     metrics={radarMetrics}
                     a={displayed}
                     b={displayedB}

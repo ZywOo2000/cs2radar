@@ -1,10 +1,12 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SequenceRadar, type SequenceRadarHandle } from '@/components/sequence-radar';
+import {copyRadarBackground,type RadarBackground} from '@/lib/radar-background';
 import type { Metric } from '@/lib/stats';
 import type { SequenceParticipant } from '@/lib/video-sequence';
 
 type Snapshot = {
+  background?: RadarBackground;
   people: SequenceParticipant[];
   metrics: Metric[];
   drawKeys: string[];
@@ -18,7 +20,7 @@ type Pending = {
 
 /** Render the recording from a separate immutable snapshot, not the editable preview. */
 export function useSequenceExportSnapshot(
-  people: SequenceParticipant[], metrics: Metric[], drawKeys: string[], hideMissingExtras: boolean,
+  people: SequenceParticipant[], metrics: Metric[], drawKeys: string[], hideMissingExtras: boolean, background?: RadarBackground,
 ) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const pendingMount = useRef<Pending | null>(null);
@@ -38,7 +40,7 @@ export function useSequenceExportSnapshot(
         reject(new Error('视频画面初始化超时，请重试。'));
       }, 10000);
       pendingMount.current = { resolve, reject, timer };
-      setSnapshot({ people: fixedPeople, metrics: fixedMetrics, drawKeys: [...drawKeys], hideMissingExtras });
+      setSnapshot({ background:background?copyRadarBackground(background):undefined, people: fixedPeople, metrics: fixedMetrics, drawKeys: [...drawKeys], hideMissingExtras });
     });
     return { controller, people: fixedPeople };
   };
@@ -61,7 +63,7 @@ export function useSequenceExportSnapshot(
   }, []);
   const renderer = snapshot && (
     <div aria-hidden="true" style={{ position: 'fixed', left: '-10000px', top: 0, width: '1100px', visibility: 'hidden', pointerEvents: 'none' }}>
-      <SequenceRadar ref={attach} people={snapshot.people} metrics={snapshot.metrics}
+      <SequenceRadar background={snapshot.background} ref={attach} people={snapshot.people} metrics={snapshot.metrics}
         drawKeys={snapshot.drawKeys} hideMissingExtras={snapshot.hideMissingExtras} />
     </div>
   );

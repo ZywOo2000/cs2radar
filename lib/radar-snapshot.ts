@@ -1,3 +1,4 @@
+import { applyRadarAmbient } from './radar-ambient';
 import { copyRadarTextBounds } from './radar-bounds';
 
 /** Reject geometry that has overflowed JavaScript's finite numeric range. */
@@ -22,6 +23,7 @@ export function finalRadarSnapshot(source: Element): SVGSVGElement {
   assertFiniteRadarGeometry(source);
   const clone = source.cloneNode(true) as SVGSVGElement;
   copyRadarTextBounds(source, clone);
+  applyRadarAmbient(clone, 0);
   clone.querySelectorAll<SVGAnimateElement>('animate').forEach((animation) => {
     const attribute = animation.getAttribute('attributeName');
     const target = animation.getAttribute('to');

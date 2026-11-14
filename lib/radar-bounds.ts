@@ -64,7 +64,15 @@ export function applyRadarViewBox(svg:Element,padding=radarEffectPadding(svg)){
  svg.setAttribute('width',String(box.width));
  svg.setAttribute('height',String(box.height));
  svg.setAttribute('overflow','visible');
- const background=Array.from(svg.children).find(node=>node.tagName.toLowerCase()==='rect');
- if(background){background.setAttribute('x',String(box.x));background.setAttribute('y',String(box.y));background.setAttribute('width',String(box.width));background.setAttribute('height',String(box.height));background.setAttribute('rx','0')}
+ resizeRadarCanvasBackground(svg,box);
  return box;
+}
+
+/** Only an explicit canvas matte may expand; a rounded visible frame must never resize. */
+export function resizeRadarCanvasBackground(svg:Element,box:RadarViewBox){
+ const background=Array.from(svg.children).find(node=>node.tagName.toLowerCase()==='rect'&&node.getAttribute('data-radar-canvas-background')==='true');
+ if(!background)return;
+ background.setAttribute('x',String(box.x));background.setAttribute('y',String(box.y));
+ background.setAttribute('width',String(box.width));background.setAttribute('height',String(box.height));
+ background.setAttribute('rx','0');
 }

@@ -1,3 +1,4 @@
+import { applyRadarAmbient } from './radar-ambient';
 import {
   pickRadarMotion,
   RADAR_RING_EXPAND_MS,
@@ -328,12 +329,14 @@ export async function exportDynamicVideo(
           ? radarRingProgress(elapsed, expansionMs)
           : elapsed / animationMs,
       );
+      applyRadarAmbient(clone, reduced ? 0 : Math.min(elapsed, animationMs));
       frame = videoFrame(clone, graphWidth, graphHeight, title, a, b);
       await drawSvg(ctx, frame.svg, canvas.width, canvas.height);
       onProgress(Math.min(70, Math.round((elapsed / animationMs) * 70)));
       await waitFrame();
     }
     setProgress(1);
+    applyRadarAmbient(clone, reduced ? 0 : animationMs);
     frame = videoFrame(clone, graphWidth, graphHeight, title, a, b);
     const finalFrame = frame.svg,
       track = stream.getVideoTracks()[0] as

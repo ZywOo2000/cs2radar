@@ -11,6 +11,8 @@ import {
 } from 'react';
 import { collectSequenceMeasurements } from '@/lib/sequence-preparation';
 import { flushSync } from 'react-dom';
+import type {RadarBackground} from '@/lib/radar-background';
+import {applyRadarAmbient} from '@/lib/radar-ambient';
 import { Radar } from './radar';
 import { pickRadarMotion, type RadarMotionKind } from '@/lib/radar-motion';
 import { radarViewBox, type RadarViewBox } from '@/lib/radar-bounds';
@@ -38,13 +40,14 @@ export type SequenceRadarHandle = {
 export const SequenceRadar = forwardRef<
   SequenceRadarHandle,
   {
+    background?: RadarBackground;
     people: SequenceParticipant[];
     metrics: Metric[];
     onPlaying?: (value: boolean) => void;
     hideMissingExtras?: boolean;
     drawKeys?: string[];
   }
->(function SequenceRadar({ people, metrics, onPlaying, hideMissingExtras = false, drawKeys }, ref) {
+>(function SequenceRadar({ background, people, metrics, onPlaying, hideMissingExtras = false, drawKeys }, ref) {
   const timelineMetrics = useMemo(() => {
     const extras = metrics.some((m) => m.key === 'multiKillPct')
       ? performanceMetrics.filter(
@@ -76,8 +79,10 @@ export const SequenceRadar = forwardRef<
     raf = useRef(0),
     run = useRef(0),
     host = useRef<HTMLDivElement>(null);
+  const ambientTime = useRef(0);
   const renderAt = async (elapsed: number, motion: RadarMotionKind) => {
     const next = sequenceFrameAt(people, timelineMetrics, elapsed, motion);
+    ambientTime.current=elapsed;
     flushSync(() => setFrame(next));
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => resolve()),
@@ -100,6 +105,7 @@ export const SequenceRadar = forwardRef<
     const tick = () => {
       if (run.current !== id) return;
       const elapsed = performance.now() - started;
+      ambientTime.current=Math.min(elapsed,sequenceArrivalTime(people.length-1,motion));
       setFrame(sequenceFrameAt(people, timelineMetrics, elapsed, motion));
       if (elapsed < duration) raf.current = requestAnimationFrame(tick);
       else onPlaying?.(false);
@@ -138,6 +144,7 @@ export const SequenceRadar = forwardRef<
       );
       if (!active || boxes === null) return;
       setPreviewBox(unionRadarBoxes(boxes));
+      ambientTime.current=0;
       setFrame(initial);
       setPrepared(true);
       setPreparationError('');
@@ -157,12 +164,14 @@ export const SequenceRadar = forwardRef<
     if (!prepared) return;
     const svg =
       host.current?.querySelector<SVGSVGElement>('#performance-radar');
-    if (svg)
+    if (svg) {
+      applyRadarAmbient(svg,matchMedia('(prefers-reduced-motion: reduce)').matches?0:ambientTime.current);
       svg.setAttribute(
         'viewBox',
         `${previewBox.x} ${previewBox.y} ${previewBox.width} ${previewBox.height}`,
       );
-  }, [frame, previewBox, prepared]);
+    }
+  }, [frame, previewBox, prepared, background]);
   useImperativeHandle(ref, () => ({
     play,
     stop,
@@ -204,6 +213,7 @@ export const SequenceRadar = forwardRef<
       </div>
       <div className="sequence-export-frame">
         <Radar
+          background={background}
           metrics={metrics}
           a={frame.stats}
           nameA={to?.name || from?.name || '视频序列'}

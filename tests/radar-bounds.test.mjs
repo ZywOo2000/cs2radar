@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {applyRadarViewBox,copyRadarTextBounds,radarEffectPadding,radarViewBox} from '../lib/radar-bounds.ts';
+import {resizeRadarCanvasBackground,applyRadarViewBox,copyRadarTextBounds,radarEffectPadding,radarViewBox} from '../lib/radar-bounds.ts';
 
 const element=attributes=>({getAttribute:name=>attributes[name]??null});
 const series={querySelectorAll(selector){
@@ -12,7 +12,7 @@ const series={querySelectorAll(selector){
 
 test('export viewBox expands in every direction around final radar geometry',()=>{
  const attributes={viewBox:'0 0 1000 960'};
- const background={tagName:'rect',setAttribute:(name,value)=>attributes['background-'+name]=value};
+ const background={tagName:'rect',getAttribute:name=>name==='data-radar-canvas-background'?'true':null,setAttribute:(name,value)=>attributes['background-'+name]=value};
  const svg={children:[background],getAttribute:name=>attributes[name]??null,setAttribute:(name,value)=>attributes[name]=value,querySelectorAll:selector=>selector.startsWith('[data-series=')?[series]:[]};
  assert.deepEqual(radarViewBox(svg,20),{x:-90,y:-75,width:1180,height:1120});
  assert.deepEqual(applyRadarViewBox(svg,20),{x:-90,y:-75,width:1180,height:1120});
@@ -47,4 +47,16 @@ test('export bounds retain measured Best text beyond the SVG edge',()=>{
  copyRadarTextBounds(source,target);
  assert.equal(attributes['data-radar-text-bounds'],'970 40 150 52');
  assert.deepEqual(radarViewBox(target,20),{x:0,y:0,width:1140,height:960});
+});
+
+test('expanding export area never stretches a visible rounded frame or infers a canvas from its order',()=>{
+ const frameAttrs={x:'10',y:'10',width:'980',height:'940',rx:'30'};
+ const rect=attrs=>({tagName:'rect',getAttribute:k=>attrs[k]??null,setAttribute:(k,v)=>attrs[k]=v});
+ const frame=rect(frameAttrs),canvasAttrs={'data-radar-canvas-background':'true'},canvas=rect(canvasAttrs);
+ const box={x:-100,y:-50,width:1400,height:1100};
+ resizeRadarCanvasBackground({children:[frame]},box);
+ assert.deepEqual(frameAttrs,{x:'10',y:'10',width:'980',height:'940',rx:'30'});
+ resizeRadarCanvasBackground({children:[frame,canvas]},box);
+ assert.equal(canvasAttrs.x,'-100');assert.equal(canvasAttrs.width,'1400');assert.equal(canvasAttrs.rx,'0');
+ assert.equal(frameAttrs.width,'980');assert.equal(frameAttrs.rx,'30');
 });

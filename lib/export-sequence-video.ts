@@ -1,5 +1,6 @@
+import { applyRadarAmbient } from './radar-ambient';
 import type { SequenceRadarHandle } from '@/components/sequence-radar';
-import { radarViewBox, type RadarViewBox } from './radar-bounds';
+import { radarViewBox, resizeRadarCanvasBackground, type RadarViewBox } from './radar-bounds';
 import { assertFiniteRadarGeometry } from './radar-snapshot';
 import { createVideoRecorder, supportedVideoMime } from './export-video-utils';
 import { pickRadarMotion, type RadarMotionKind } from './radar-motion';
@@ -44,9 +45,10 @@ async function drawSvg(
     URL.revokeObjectURL(url);
   }
 }
-function clean(live: SVGSVGElement, box: RadarViewBox) {
+export function sequenceRadarSnapshot(live: SVGSVGElement, box: RadarViewBox, elapsed=0) {
   assertFiniteRadarGeometry(live);
   const clone = live.cloneNode(true) as SVGSVGElement;
+  applyRadarAmbient(clone, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : elapsed);
   clone.querySelectorAll('animate,title,desc').forEach((n) => n.remove());
   clone
     .querySelectorAll(
@@ -58,16 +60,7 @@ function clean(live: SVGSVGElement, box: RadarViewBox) {
   clone.setAttribute('viewBox', `${box.x} ${box.y} ${box.width} ${box.height}`);
   clone.setAttribute('width', String(box.width));
   clone.setAttribute('height', String(box.height));
-  const bg = Array.from(clone.children).find(
-    (n) => n.tagName.toLowerCase() === 'rect',
-  );
-  if (bg) {
-    bg.setAttribute('x', String(box.x));
-    bg.setAttribute('y', String(box.y));
-    bg.setAttribute('width', String(box.width));
-    bg.setAttribute('height', String(box.height));
-    bg.setAttribute('rx', '0');
-  }
+  resizeRadarCanvasBackground(clone,box);
   return clone;
 }
 function compose(clone: SVGSVGElement, box: RadarViewBox) {
@@ -111,7 +104,7 @@ export async function exportSequenceVideo(
   await controller.renderAt(0, motion);
   let live = controller.getSvg();
   if (!live) throw new Error('雷达图尚未就绪。');
-  let frame = compose(clean(live, box), box);
+  let frame = compose(sequenceRadarSnapshot(live, box), box);
   const canvas = document.createElement('canvas');
   canvas.width = SEQUENCE_VIDEO_FRAME.width;
   canvas.height = SEQUENCE_VIDEO_FRAME.height;
@@ -146,7 +139,7 @@ export async function exportSequenceVideo(
       await controller.renderAt(Math.min(elapsed, animationMs), motion);
       live = controller.getSvg();
       if (!live) throw new Error('雷达图渲染中断。');
-      frame = compose(clean(live, box), box);
+      frame = compose(sequenceRadarSnapshot(live, box, Math.min(elapsed, animationMs)), box);
       await drawSvg(ctx, frame, canvas.width, canvas.height);
       onProgress(
         Math.min(
@@ -159,7 +152,7 @@ export async function exportSequenceVideo(
     await controller.renderAt(animationMs, motion);
     live = controller.getSvg();
     if (!live) throw new Error('雷达图渲染中断。');
-    const finalFrame = compose(clean(live, box), box),
+    const finalFrame = compose(sequenceRadarSnapshot(live, box, animationMs), box),
       track = stream.getVideoTracks()[0] as
         | CanvasCaptureMediaStreamTrack
         | undefined;
